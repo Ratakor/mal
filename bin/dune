@@ -1,6 +1,6 @@
 (executable
- (public_name mal)
- (name main)
+ (public_name step0_repl)
+ (name step0_repl)
  (libraries mal containers)
  (flags
   (:standard -open Containers)))
