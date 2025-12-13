@@ -1,0 +1,6 @@
+(executable
+ (public_name mal)
+ (name main)
+ (libraries mal containers)
+ (flags
+  (:standard -open Containers)))
