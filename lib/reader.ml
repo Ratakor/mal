@@ -47,4 +47,13 @@ and read_atom = function
       else Ok (T.String (unescaped x))
   | symbol -> Ok (T.Symbol symbol)
 
-let read_str str = Result.(str |> tokenize |> read_form >|= fst)
+let read_str str =
+  Result.(
+    str
+    |> tokenize
+    |> read_form
+    >>= fun (form, tokens) ->
+    match tokens with
+    | [] -> Ok form
+    | _ ->
+        Error (Some ("Remaining tokens: " ^ List.to_string (fun x -> x) tokens)))
