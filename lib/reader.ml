@@ -1,3 +1,4 @@
+open Result
 module T = Types
 
 let number_re = Str.regexp {|-?[0-9]+|}
@@ -27,7 +28,7 @@ let rec read_form = function
   | "(" :: tokens -> read_list tokens
   | "[" :: tokens -> read_vector tokens
   | "{" :: tokens -> read_map tokens
-  | x :: tokens -> Result.(read_atom x >|= fun x -> (x, tokens))
+  | x :: tokens -> read_atom x >|= fun x -> (x, tokens)
 
 and read_collection closing =
   let rec aux acc = function
@@ -41,16 +42,12 @@ and read_collection closing =
   in
   aux []
 
-and read_list tokens =
-  Result.(read_collection ")" tokens >|= Pair.map_fst T.list)
-
-and read_vector tokens =
-  Result.(read_collection "]" tokens >|= Pair.map_fst T.vector)
+and read_list tokens = read_collection ")" tokens >|= Pair.map_fst T.list
+and read_vector tokens = read_collection "]" tokens >|= Pair.map_fst T.vector
 
 and read_map tokens =
-  Result.(
-    let* list, tokens = read_collection "}" tokens in
-    T.map_of_list list |> Result.map2 (fun m -> (m, tokens)) (fun e -> Some e))
+  let* list, tokens = read_collection "}" tokens in
+  T.map_of_list list |> Result.map2 (fun m -> (m, tokens)) (fun e -> Some e)
 
 and read_atom = function
   | "nil" -> Ok T.Nil
@@ -66,12 +63,10 @@ and read_atom = function
   | x -> Ok (T.Symbol x)
 
 let read_str str =
-  Result.(
-    str
-    |> tokenize
-    |> read_form
-    >>= fun (form, tokens) ->
-    match tokens with
-    | [] -> Ok form
-    | _ ->
-        Error (Some ("Remaining tokens: " ^ List.to_string (fun x -> x) tokens)))
+  str
+  |> tokenize
+  |> read_form
+  >>= fun (form, tokens) ->
+  match tokens with
+  | [] -> return form
+  | _ -> fail (Some ("Remaining tokens: " ^ List.to_string (fun x -> x) tokens))
