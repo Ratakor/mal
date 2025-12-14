@@ -15,6 +15,7 @@ let tokenize str =
     | Str.Delim _ -> None
     | Str.Text _ -> None)
 
+let is_comment s = Char.(s.[0] = ';')
 let is_int_literal s = Str.string_match number_re s 0
 let is_string_literal s = Char.(s.[0] = '"')
 let is_keyword_literal s = Char.(s.[0] = ':')
@@ -22,6 +23,7 @@ let unescaped s = Scanf.sscanf s "%S%!" (fun x -> x)
 
 let rec read_form = function
   | [] -> Error None
+  | x :: tokens when is_comment x -> read_form tokens
   | "(" :: tokens -> read_list tokens
   | "[" :: tokens -> read_vector tokens
   | x :: tokens -> Result.(read_atom x >|= fun x -> (x, tokens))
@@ -30,9 +32,11 @@ and read_collection closing =
   let rec aux acc = function
     | [] -> Error (Some ("Unmatched " ^ closing))
     | x :: tokens when String.(x = closing) -> Ok (List.rev acc, tokens)
-    | tokens ->
-        Result.(
-          read_form tokens >>= fun (form, tokens) -> aux (form :: acc) tokens)
+    | tokens -> (
+        match read_form tokens with
+        | Error None -> Error (Some ("Unmatched " ^ closing))
+        | Error x -> Error x
+        | Ok (form, tokens) -> aux (form :: acc) tokens)
   in
   aux []
 
