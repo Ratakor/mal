@@ -26,6 +26,7 @@ let rec read_form = function
   | x :: tokens when is_comment x -> read_form tokens
   | "(" :: tokens -> read_list tokens
   | "[" :: tokens -> read_vector tokens
+  | "{" :: tokens -> read_map tokens
   | x :: tokens -> Result.(read_atom x >|= fun x -> (x, tokens))
 
 and read_collection closing =
@@ -45,6 +46,11 @@ and read_list tokens =
 
 and read_vector tokens =
   Result.(read_collection "]" tokens >|= Pair.map_fst T.vector)
+
+and read_map tokens =
+  Result.(
+    let* list, tokens = read_collection "}" tokens in
+    T.map_of_list list |> Result.map2 (fun m -> (m, tokens)) (fun e -> Some e))
 
 and read_atom = function
   | "nil" -> Ok T.Nil
