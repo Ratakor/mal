@@ -11,6 +11,10 @@ end)
 let read str = Reader.read_str str
 
 let rec eval env ast =
+  (match Env.get "DEBUG-EVAL" env with
+  | None | Some T.Nil | Some (T.Bool false) -> ()
+  | _ -> printf "EVAL: %s\n%!" (Printer.pr_str true ast));
+
   match ast with
   | T.Symbol x -> (
       match Env.get x env with
@@ -38,6 +42,7 @@ let repl_env =
   Env.set "-" (int_fn ( - )) env;
   Env.set "*" (int_fn ( * )) env;
   Env.set "/" (int_fn ( / )) env;
+  Env.set "DEBUG-EVAL" (T.Bool false) env;
   env
 
 let rep str =
