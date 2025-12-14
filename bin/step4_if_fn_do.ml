@@ -1,7 +1,7 @@
 open Printf
 module T = Types
 
-module TraverseList = List.Traverse (struct
+module ListTraverse = List.Traverse (struct
   type 'a t = ('a, string) result
 
   let return = Result.return
@@ -21,7 +21,6 @@ let rec eval env ast =
       match Env.get x env with
       | Some v -> Ok v
       | None -> Error (sprintf "'%s' not found" x))
-  (* By matching on 'def!' and 'let*' directly we allow to "override" their value *)
   | T.List [ T.Symbol "def!"; T.Symbol key; x ] ->
       let* value = eval env x in
       Env.set key value env;
@@ -40,12 +39,14 @@ let rec eval env ast =
       in
       let* () = bind_pairs bindings in
       eval sub_env body
+  | T.List (T.Symbol "do" :: body) ->
+      ListTraverse.fold_m (fun _acc x -> eval env x) T.Nil body
   | T.List (x :: xs) -> (
       match eval env x with
-      | Ok (T.Fn f) -> TraverseList.map_m (eval env) xs >>= f
+      | Ok (T.Fn f) -> ListTraverse.map_m (eval env) xs >>= f
       | Ok _ -> Error (sprintf "'%s' is not callable" (Printer.pr_str true x))
       | Error e -> Error e)
-  | T.Vector xs -> TraverseList.map_m (eval env) xs >|= T.vector
+  | T.Vector xs -> ListTraverse.map_m (eval env) xs >|= T.vector
   | T.Map xs ->
       T.MalMap.fold
         (fun k v acc ->
