@@ -30,6 +30,7 @@ include Types
 let list x = Types.List x
 let vector x = Types.Vector x
 let map x = Types.Map x
+let fn x = Types.Fn x
 
 let map_of_list x =
   let rec aux acc = function

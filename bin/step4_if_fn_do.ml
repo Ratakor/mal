@@ -25,8 +25,8 @@ let rec eval env ast =
       let* value = eval env expr in
       Env.set key value env;
       Ok value
-  | T.List [ T.Symbol "let*"; T.List bindings; body ]
-  | T.List [ T.Symbol "let*"; T.Vector bindings; body ] ->
+  | T.List [ T.Symbol "let*"; T.List binds; body ]
+  | T.List [ T.Symbol "let*"; T.Vector binds; body ] ->
       let sub_env = Env.make (Some env) in
       let rec bind_pairs = function
         | T.Symbol key :: expr :: tail ->
@@ -37,7 +37,7 @@ let rec eval env ast =
         | _ :: [] -> Error "'let*' bindings must be an even number of elements"
         | [] -> Ok ()
       in
-      let* () = bind_pairs bindings in
+      let* () = bind_pairs binds in
       eval sub_env body
   | T.List (T.Symbol "do" :: body) ->
       ListTraverse.fold_m (fun _acc x -> eval env x) T.Nil body
@@ -51,6 +51,24 @@ let rec eval env ast =
       >>= function
       | T.Nil | T.Bool false -> Ok T.Nil
       | _ -> eval env then_expr)
+  | T.List [ T.Symbol "fn*"; T.List binds; body ]
+  | T.List [ T.Symbol "fn*"; T.Vector binds; body ] ->
+      (fun exprs ->
+        let sub_env = Env.make (Some env) in
+        let rec bind_args = function
+          | T.Symbol name :: names, arg :: args ->
+              Env.set name arg sub_env;
+              bind_args (names, args)
+          | [], [] -> Ok ()
+          | _ ->
+              Error
+                (sprintf "Expected %d args, got %d" (List.length binds)
+                   (List.length exprs))
+        in
+        let* () = bind_args (binds, exprs) in
+        eval sub_env body)
+      |> Types.fn
+      |> return
   | T.List (x :: xs) -> (
       match eval env x with
       | Ok (T.Fn f) -> ListTraverse.map_m (eval env) xs >>= f
