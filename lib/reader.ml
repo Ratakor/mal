@@ -20,31 +20,31 @@ let is_string_literal s = Char.(s.[0] = '"')
 let unescaped s = Scanf.sscanf s "%S%!" (fun x -> x)
 
 let rec read_form = function
-  | [] -> None
+  | [] -> Error None
   | "(" :: tokens -> read_list tokens
-  | x :: tokens -> Option.(read_atom x >|= fun x -> (x, tokens))
+  | x :: tokens -> Result.(read_atom x >|= fun x -> (x, tokens))
 
 and read_collection closing forms = function
-  | [] -> None
-  | x :: tokens when String.(x = closing) -> Some (forms, tokens)
+  | [] -> Error (Some ("Unmatched " ^ closing))
+  | x :: tokens when String.(x = closing) -> Ok (forms, tokens)
   | tokens ->
-      Option.(
+      Result.(
         read_form tokens
         >>= fun (form, tokens) ->
         read_collection closing (forms @ [ form ]) tokens)
 
 and read_list tokens =
-  Option.(read_collection ")" [] tokens >|= Pair.map_fst T.list)
+  Result.(read_collection ")" [] tokens >|= Pair.map_fst T.list)
 
 and read_atom = function
-  | "nil" -> Some T.Nil
-  | "true" -> Some (T.Bool true)
-  | "false" -> Some (T.Bool false)
-  | x when is_int_literal x -> Some (T.Int (int_of_string x))
+  | "nil" -> Ok T.Nil
+  | "true" -> Ok (T.Bool true)
+  | "false" -> Ok (T.Bool false)
+  | x when is_int_literal x -> Ok (T.Int (int_of_string x))
   | x when is_string_literal x ->
       let len = String.length x in
-      if len = 1 || Char.(x.[len - 1] <> '"') then None
-      else Some (T.String (unescaped x))
-  | symbol -> Some (T.Symbol symbol)
+      if len = 1 || Char.(x.[len - 1] <> '"') then Error (Some "Unmatched \"")
+      else Ok (T.String (unescaped x))
+  | symbol -> Ok (T.Symbol symbol)
 
-let read_str str = Option.(str |> tokenize |> read_form >|= fst)
+let read_str str = Result.(str |> tokenize |> read_form >|= fst)
