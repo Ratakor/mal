@@ -1,6 +1,15 @@
 open Printf
 module T = Types
 
+module ResultMonad = struct
+  type 'a t = ('a, string) result
+
+  let return = Result.return
+  let ( >>= ) = Result.( >>= )
+end
+
+module TraverseM = List.Traverse (ResultMonad)
+
 let repl_env =
   let int_fn f =
     T.Fn
@@ -21,16 +30,19 @@ let rec eval env ast =
   match ast with
   | T.Symbol x -> (
       match Env.get x env with
-      | Some v -> v
-      | None -> raise Not_found)
+      | Some v -> Ok v
+      | None -> Error ("Symbol not found: " ^ x))
   | T.List (x :: xs) -> (
       match eval env x with
-      | T.Fn f -> f (List.map (eval env) xs) |> Result.get_exn
-      | _ -> invalid_arg "bad")
-  | _ -> ast
+      | Ok (T.Fn f) -> Result.(TraverseM.map_m (eval env) xs >>= f)
+      | Ok _ -> Error "Invalid argument"
+      | Error e -> Error e)
+  | _ -> Ok ast
 
 let print exp = Printer.pr_str true exp
-let rep str = Result.(str |> read >|= eval repl_env >|= print)
+
+let rep str =
+  Result.(str |> read >|= eval repl_env >>= map_err Option.some >|= print)
 
 let () =
   try
