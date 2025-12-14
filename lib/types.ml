@@ -7,9 +7,11 @@ module rec Types : sig
     | Symbol of string
     | Keyword of string
     | List of t list
+    | Vector of t list
 end =
   Types
 
 include Types
 
 let list x = Types.List x
+let vector x = Types.Vector x

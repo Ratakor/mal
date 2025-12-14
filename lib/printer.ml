@@ -8,3 +8,5 @@ let rec pr_str readably = function
   | T.String x | T.Symbol x -> x
   | T.Keyword x -> ":" ^ x
   | T.List x -> List.to_string ~start:"(" ~stop:")" ~sep:" " (pr_str readably) x
+  | T.Vector x ->
+      List.to_string ~start:"[" ~stop:"]" ~sep:" " (pr_str readably) x

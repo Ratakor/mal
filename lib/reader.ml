@@ -23,19 +23,24 @@ let unescaped s = Scanf.sscanf s "%S%!" (fun x -> x)
 let rec read_form = function
   | [] -> Error None
   | "(" :: tokens -> read_list tokens
+  | "[" :: tokens -> read_vector tokens
   | x :: tokens -> Result.(read_atom x >|= fun x -> (x, tokens))
 
-and read_collection closing forms = function
-  | [] -> Error (Some ("Unmatched " ^ closing))
-  | x :: tokens when String.(x = closing) -> Ok (forms, tokens)
-  | tokens ->
-      Result.(
-        read_form tokens
-        >>= fun (form, tokens) ->
-        read_collection closing (forms @ [ form ]) tokens)
+and read_collection closing =
+  let rec aux acc = function
+    | [] -> Error (Some ("Unmatched " ^ closing))
+    | x :: tokens when String.(x = closing) -> Ok (List.rev acc, tokens)
+    | tokens ->
+        Result.(
+          read_form tokens >>= fun (form, tokens) -> aux (form :: acc) tokens)
+  in
+  aux []
 
 and read_list tokens =
-  Result.(read_collection ")" [] tokens >|= Pair.map_fst T.list)
+  Result.(read_collection ")" tokens >|= Pair.map_fst T.list)
+
+and read_vector tokens =
+  Result.(read_collection "]" tokens >|= Pair.map_fst T.vector)
 
 and read_atom = function
   | "nil" -> Ok T.Nil
