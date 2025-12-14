@@ -21,16 +21,16 @@ let rec eval env ast =
       match Env.get x env with
       | Some v -> Ok v
       | None -> Error (sprintf "'%s' not found" x))
-  | T.List [ T.Symbol "def!"; T.Symbol key; x ] ->
-      let* value = eval env x in
+  | T.List [ T.Symbol "def!"; T.Symbol key; expr ] ->
+      let* value = eval env expr in
       Env.set key value env;
       Ok value
   | T.List [ T.Symbol "let*"; T.List bindings; body ]
   | T.List [ T.Symbol "let*"; T.Vector bindings; body ] ->
       let sub_env = Env.make (Some env) in
       let rec bind_pairs = function
-        | T.Symbol key :: x :: tail ->
-            let* value = eval sub_env x in
+        | T.Symbol key :: expr :: tail ->
+            let* value = eval sub_env expr in
             Env.set key value sub_env;
             bind_pairs tail
         | _ :: _ :: _ -> Error "'let*' keys must be symbols"
@@ -41,6 +41,16 @@ let rec eval env ast =
       eval sub_env body
   | T.List (T.Symbol "do" :: body) ->
       ListTraverse.fold_m (fun _acc x -> eval env x) T.Nil body
+  | T.List [ T.Symbol "if"; cond; then_expr; else_expr ] -> (
+      eval env cond
+      >>= function
+      | T.Nil | T.Bool false -> eval env else_expr
+      | _ -> eval env then_expr)
+  | T.List [ T.Symbol "if"; cond; then_expr ] -> (
+      eval env cond
+      >>= function
+      | T.Nil | T.Bool false -> Ok T.Nil
+      | _ -> eval env then_expr)
   | T.List (x :: xs) -> (
       match eval env x with
       | Ok (T.Fn f) -> ListTraverse.map_m (eval env) xs >>= f
