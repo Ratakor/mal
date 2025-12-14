@@ -1,9 +1,9 @@
 open Printf
 
 let read str = Reader.read_str str
-let eval ast = ast
+let eval _env ast = ast
 let print exp = Printer.pr_str true exp
-let rep str = Result.(str |> read >|= eval >|= print)
+let rep str = Result.(str |> read >|= eval "" >|= print)
 
 let () =
   try
@@ -13,6 +13,6 @@ let () =
       match rep line with
       | Ok x -> printf "%s\n%!" x
       | Error None -> ()
-      | Error (Some x) -> eprintf "Error: %s\n%!" x
+      | Error (Some x) -> printf "Error: %s\n%!" x
     done
   with End_of_file -> print_newline ()
