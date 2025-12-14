@@ -2,7 +2,7 @@ open Printf
 
 let read str = Reader.read_str str
 let eval ast = ast
-let print exp = Printer.pr_str exp
+let print exp = Printer.pr_str true exp
 let rep str = Option.(str |> read >|= eval >|= print)
 
 let () =

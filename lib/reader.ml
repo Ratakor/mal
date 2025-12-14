@@ -17,6 +17,7 @@ let tokenize str =
 
 let is_int_literal s = Str.string_match number_re s 0
 let is_string_literal s = Char.(s.[0] = '"')
+let unescaped s = Scanf.sscanf s "%S%!" (fun x -> x)
 
 let rec read_form = function
   | [] -> None
@@ -40,7 +41,10 @@ and read_atom = function
   | "true" -> Some (T.Bool true)
   | "false" -> Some (T.Bool false)
   | x when is_int_literal x -> Some (T.Int (int_of_string x))
-  (* | x when is_string_literal x -> Some *)
+  | x when is_string_literal x ->
+      let len = String.length x in
+      if len = 1 || Char.(x.[len - 1] <> '"') then None
+      else Some (T.String (unescaped x))
   | symbol -> Some (T.Symbol symbol)
 
 let read_str str = Option.(str |> tokenize |> read_form >|= fst)
