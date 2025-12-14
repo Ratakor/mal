@@ -18,3 +18,10 @@
  (libraries mal containers)
  (flags
   (:standard -open Containers)))
+
+(executable
+ (public_name step3_env)
+ (name step3_env)
+ (libraries mal containers)
+ (flags
+  (:standard -open Containers)))

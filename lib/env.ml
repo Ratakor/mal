@@ -1,15 +1,15 @@
 module T = Types
-module M = Map.Make (String)
+module Data = Map.Make (String)
 
 type env = {
   outer : env option;
-  map : T.t M.t ref;
+  data : T.t Data.t ref;
 }
 
-let make outer = { outer; map = ref M.empty }
-let set key value env = env.map := M.add key value !(env.map)
+let make outer = { outer; data = ref Data.empty }
+let set key value env = env.data := Data.add key value !(env.data)
 
 let rec get key env =
-  match M.find_opt key !(env.map) with
+  match Data.find_opt key !(env.data) with
   | Some x -> Some x
   | None -> Option.(env.outer >>= get key)
