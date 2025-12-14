@@ -26,7 +26,17 @@ let rec eval env ast =
       | Ok _ -> Error (sprintf "'%s' is not callable" (Printer.pr_str true x))
       | Error e -> Error e)
   | T.Vector xs -> Result.(TraverseList.map_m (eval env) xs >|= T.vector)
-  | _ -> Ok ast
+  | T.Map xs ->
+      Result.(
+        T.MalMap.fold
+          (fun k v acc ->
+            let* acc' = acc in
+            let* k' = eval env k in
+            let* v' = eval env v in
+            return (T.MalMap.add k' v' acc'))
+          xs (Ok T.MalMap.empty)
+        >|= T.map)
+  | x -> Ok x
 
 let print exp = Printer.pr_str true exp
 
