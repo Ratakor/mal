@@ -11,6 +11,7 @@ end)
 let read str = Reader.read_str str
 
 let rec eval env ast =
+  let open Result in
   (match Env.get "DEBUG-EVAL" env with
   | None | Some T.Nil | Some (T.Bool false) -> ()
   | _ -> printf "EVAL: %s\n%!" (Printer.pr_str true ast));
@@ -22,20 +23,19 @@ let rec eval env ast =
       | None -> Error (sprintf "'%s' not found" x))
   | T.List (x :: xs) -> (
       match eval env x with
-      | Ok (T.Fn f) -> Result.(TraverseList.map_m (eval env) xs >>= f)
+      | Ok (T.Fn f) -> TraverseList.map_m (eval env) xs >>= f
       | Ok _ -> Error (sprintf "'%s' is not callable" (Printer.pr_str true x))
       | Error e -> Error e)
-  | T.Vector xs -> Result.(TraverseList.map_m (eval env) xs >|= T.vector)
+  | T.Vector xs -> TraverseList.map_m (eval env) xs >|= T.vector
   | T.Map xs ->
-      Result.(
-        T.MalMap.fold
-          (fun k v acc ->
-            let* acc' = acc in
-            let* k' = eval env k in
-            let* v' = eval env v in
-            return (T.MalMap.add k' v' acc'))
-          xs (Ok T.MalMap.empty)
-        >|= T.map)
+      T.MalMap.fold
+        (fun k v acc ->
+          let* acc' = acc in
+          let* k' = eval env k in
+          let* v' = eval env v in
+          return (T.MalMap.add k' v' acc'))
+        xs (Ok T.MalMap.empty)
+      >|= T.map
   | x -> Ok x
 
 let print exp = Printer.pr_str true exp
