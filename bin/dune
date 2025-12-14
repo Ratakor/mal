@@ -25,3 +25,10 @@
  (libraries mal containers)
  (flags
   (:standard -open Containers)))
+
+(executable
+ (public_name step4_if_fn_do)
+ (name step4_if_fn_do)
+ (libraries mal containers)
+ (flags
+  (:standard -open Containers)))

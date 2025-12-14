@@ -15,6 +15,6 @@ let pr_str readably =
         (* |> List.rev *)
         |> List.to_string ~start:"{" ~stop:"}" ~sep:" " (fun (k, v) ->
             Printf.sprintf "%s %s" (aux k) (aux v))
-    | T.Fn _ -> "#<fn>"
+    | T.Fn _ -> "#<function>"
   in
   aux
