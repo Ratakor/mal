@@ -1,14 +1,30 @@
 open Printf
 module T = Types
 
-module ResultMonad = struct
+module TraverseList = List.Traverse (struct
   type 'a t = ('a, string) result
 
   let return = Result.return
   let ( >>= ) = Result.( >>= )
-end
+end)
 
-module TraverseM = List.Traverse (ResultMonad)
+let read str = Reader.read_str str
+
+let rec eval env ast =
+  match ast with
+  | T.Symbol x -> (
+      match Env.get x env with
+      | Some v -> Ok v
+      | None -> Error (sprintf "'%s' not found" x))
+  | T.List (x :: xs) -> (
+      match eval env x with
+      | Ok (T.Fn f) -> Result.(TraverseList.map_m (eval env) xs >>= f)
+      | Ok _ -> Error (sprintf "'%s' is not callable" (Printer.pr_str true x))
+      | Error e -> Error e)
+  | T.Vector xs -> Result.(TraverseList.map_m (eval env) xs >|= T.vector)
+  | _ -> Ok ast
+
+let print exp = Printer.pr_str true exp
 
 let repl_env =
   let int_fn f =
@@ -23,23 +39,6 @@ let repl_env =
   Env.set "*" (int_fn ( * )) env;
   Env.set "/" (int_fn ( / )) env;
   env
-
-let read str = Reader.read_str str
-
-let rec eval env ast =
-  match ast with
-  | T.Symbol x -> (
-      match Env.get x env with
-      | Some v -> Ok v
-      | None -> Error ("Symbol not found: " ^ x))
-  | T.List (x :: xs) -> (
-      match eval env x with
-      | Ok (T.Fn f) -> Result.(TraverseM.map_m (eval env) xs >>= f)
-      | Ok _ -> Error "Invalid argument"
-      | Error e -> Error e)
-  | _ -> Ok ast
-
-let print exp = Printer.pr_str true exp
 
 let rep str =
   Result.(str |> read >|= eval repl_env >>= map_err Option.some >|= print)
