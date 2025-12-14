@@ -11,3 +11,10 @@
  (libraries mal containers)
  (flags
   (:standard -open Containers)))
+
+(executable
+ (public_name step2_eval)
+ (name step2_eval)
+ (libraries mal containers)
+ (flags
+  (:standard -open Containers)))

@@ -10,3 +10,4 @@ let rec pr_str readably = function
   | T.List x -> List.to_string ~start:"(" ~stop:")" ~sep:" " (pr_str readably) x
   | T.Vector x ->
       List.to_string ~start:"[" ~stop:"]" ~sep:" " (pr_str readably) x
+  | T.Fn _ -> "#<fn>"

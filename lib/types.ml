@@ -8,6 +8,7 @@ module rec Types : sig
     | Keyword of string
     | List of t list
     | Vector of t list
+    | Fn of (t list -> (t, string) result)
 end =
   Types
 
