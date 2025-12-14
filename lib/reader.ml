@@ -17,6 +17,7 @@ let tokenize str =
 
 let is_int_literal s = Str.string_match number_re s 0
 let is_string_literal s = Char.(s.[0] = '"')
+let is_keyword_literal s = Char.(s.[0] = ':')
 let unescaped s = Scanf.sscanf s "%S%!" (fun x -> x)
 
 let rec read_form = function
@@ -45,7 +46,9 @@ and read_atom = function
       let len = String.length x in
       if len = 1 || Char.(x.[len - 1] <> '"') then Error (Some "Unmatched \"")
       else Ok (T.String (unescaped x))
-  | symbol -> Ok (T.Symbol symbol)
+  | x when is_keyword_literal x ->
+      Ok (T.Keyword (String.sub x 1 (String.length x - 1)))
+  | x -> Ok (T.Symbol x)
 
 let read_str str =
   Result.(
