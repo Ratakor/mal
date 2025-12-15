@@ -1,7 +1,21 @@
 open Printf
 module T = Types.Types
 
-let read str = Reader.read_str str
+let rec quasiquote = function
+  | T.List [ T.Symbol "unquote"; x ] -> x
+  | T.List xs -> qq_list xs
+  | T.Vector xs -> T.List [ T.Symbol "vec"; qq_list xs ]
+  | (T.Map _ | T.Symbol _) as ast -> T.List [ T.Symbol "quote"; ast ]
+  | ast -> ast
+
+and qq_list xs =
+  List.fold_left
+    (fun acc elt ->
+      match elt with
+      | T.List [ T.Symbol "splice-unquote"; x ] ->
+          T.List [ T.Symbol "concat"; x; acc ]
+      | _ -> T.List [ T.Symbol "cons"; quasiquote elt; acc ])
+    (T.List []) (List.rev xs)
 
 let rec eval env ast =
   let open Result in
@@ -65,6 +79,8 @@ let rec eval env ast =
         eval sub_env body)
       |> Types.fn
       |> return
+  | T.List [ T.Symbol "quote"; ast ] -> Ok ast
+  | T.List [ T.Symbol "quasiquote"; ast ] -> eval env (quasiquote ast)
   | T.List (x :: xs) -> (
       match eval env x with
       | Ok (T.Fn f) -> Utils.ListTraverse.map_m (eval env) xs >>= f
@@ -82,6 +98,7 @@ let rec eval env ast =
       >|= Types.map
   | x -> Ok x
 
+let read str = Reader.read_str str
 let print exp = Printer.pr_str true exp
 let re str = Result.(str |> read >|= eval Core.ns >>= map_err Option.some)
 let rep str = Result.(str |> re >|= print)
@@ -110,7 +127,9 @@ let () =
   |> ignore;
 
   if Array.length Sys.argv > 1 then
-    re (sprintf {|(load-file "%s")|} Sys.argv.(1)) |> ignore
+    match re (sprintf {|(load-file "%s")|} Sys.argv.(1)) with
+    | Error (Some x) -> printf "Error: %s\n%!" x
+    | _ -> ()
   else
     try
       while true do

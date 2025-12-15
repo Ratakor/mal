@@ -37,6 +37,10 @@ let atom = function
   | [ x ] -> Ok (Types.atom x)
   | _ -> invalid_arg __FUNCTION__
 
+let vec = function
+  | [ T.List xs ] | [ T.Vector xs ] -> Ok (T.Vector xs)
+  | _ -> invalid_arg __FUNCTION__
+
 let is_list = function
   | [ T.List _ ] -> Ok (T.Bool true)
   | _ -> Ok (T.Bool false)
@@ -136,6 +140,7 @@ let init env =
   set "list" Fun.(Types.list %> Result.return);
   (* set "atom" Fun.(List.hd %> Types.atom %> Result.return); *)
   set "atom" atom;
+  set "vec" vec;
 
   set "list?" is_list;
   set "atom?" is_atom;

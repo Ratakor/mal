@@ -34,6 +34,10 @@ let rec read_form = function
   | "[" :: tokens -> read_vector tokens
   | "{" :: tokens -> read_map tokens
   | "@" :: tokens -> read_quote "deref" tokens
+  | "'" :: tokens -> read_quote "quote" tokens
+  | "`" :: tokens -> read_quote "quasiquote" tokens
+  | "~" :: tokens -> read_quote "unquote" tokens
+  | "~@" :: tokens -> read_quote "splice-unquote" tokens
   | x :: tokens -> Result.(read_atom x >|= fun x -> (x, tokens))
 
 and read_collection closing =
