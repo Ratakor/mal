@@ -10,6 +10,7 @@ module rec Types : sig
     | Vector of t list
     | Map of t MalMap.t
     | Fn of (t list -> (t, string) result)
+    | Atom of t ref
 end =
   Types
 
@@ -34,6 +35,7 @@ let list x = Types.List x
 let vector x = Types.Vector x
 let map x = Types.Map x
 let fn x = Types.Fn x
+let atom x = Types.Atom (ref x)
 
 let map_of_list x =
   let rec aux acc = function

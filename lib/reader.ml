@@ -24,7 +24,8 @@ let unescaped s =
   try Ok (Scanf.sscanf s "%S%!" Fun.id)
   with e -> Error (Some (Printexc.to_string e))
 
-let unbalanced_msg closing = Printf.sprintf "Expected '%s', got EOF" closing
+let unexpected_eof expected =
+  Error (Some (Printf.sprintf "Expected '%s', got EOF" expected))
 
 let rec read_form = function
   | [] -> Error None
@@ -32,16 +33,17 @@ let rec read_form = function
   | "(" :: tokens -> read_list tokens
   | "[" :: tokens -> read_vector tokens
   | "{" :: tokens -> read_map tokens
+  | "@" :: tokens -> read_quote "deref" tokens
   | x :: tokens -> Result.(read_atom x >|= fun x -> (x, tokens))
 
 and read_collection closing =
   let rec aux acc = function
-    | [] -> Error (Some (unbalanced_msg closing))
+    | [] -> unexpected_eof closing
     | x :: tokens when String.(x = closing) -> Ok (List.rev acc, tokens)
     | tokens -> (
         match read_form tokens with
-        | Error None -> Error (Some (unbalanced_msg closing))
-        | Error x -> Error x
+        | Error None -> unexpected_eof closing
+        | Error _ as err -> err
         | Ok (form, tokens) -> aux (form :: acc) tokens)
   in
   aux []
@@ -56,6 +58,12 @@ and read_map tokens =
   let open Result in
   let* list, tokens = read_collection "}" tokens in
   Types.map_of_list list |> Result.map2 (fun m -> (m, tokens)) (fun e -> Some e)
+
+and read_quote symbol tokens =
+  match read_form tokens with
+  | Error None -> unexpected_eof "expr"
+  | Error _ as err -> err
+  | Ok (form, tokens) -> Ok (T.List [ T.Symbol symbol; form ], tokens)
 
 and read_atom = function
   | "nil" -> Ok T.Nil

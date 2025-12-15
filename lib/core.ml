@@ -15,8 +15,16 @@ let int_cmp_binary f = function
   | [ T.Int a; T.Int b ] -> Ok (T.Bool (f a b))
   | _ -> invalid_arg __FUNCTION__
 
+let atom = function
+  | [ x ] -> Ok (Types.atom x)
+  | _ -> invalid_arg __FUNCTION__
+
 let is_list = function
   | [ T.List _ ] -> Ok (T.Bool true)
+  | _ -> Ok (T.Bool false)
+
+let is_atom = function
+  | [ T.Atom _ ] -> Ok (T.Bool true)
   | _ -> Ok (T.Bool false)
 
 let is_empty = function
@@ -27,6 +35,24 @@ let is_empty = function
 let count = function
   | [ T.List xs ] | [ T.Vector xs ] -> Ok (T.Int (List.length xs))
   (* | [ T.Nil ] -> Ok (T.Int 0) *)
+  | _ -> invalid_arg __FUNCTION__
+
+let deref = function
+  | [ T.Atom x ] -> Ok !x
+  | _ -> invalid_arg __FUNCTION__
+
+let reset = function
+  | [ T.Atom x; v ] ->
+      x := v;
+      Ok v
+  | _ -> invalid_arg __FUNCTION__
+
+let swap = function
+  | T.Atom x :: T.Fn f :: args ->
+      let open Result in
+      let* v = f (!x :: args) in
+      x := v;
+      Ok v
   | _ -> invalid_arg __FUNCTION__
 
 let pr_str_list sep readably xs =
@@ -75,11 +101,18 @@ let init env =
   set "/" (arith_binary Int.( / ));
 
   set "list" Fun.(Types.list %> Result.return);
+  (* set "atom" Fun.(List.hd %> Types.atom %> Result.return); *)
+  set "atom" atom;
 
   set "list?" is_list;
+  set "atom?" is_atom;
 
   set "empty?" is_empty;
   set "count" count;
+
+  set "deref" deref;
+  set "reset!" reset;
+  set "swap!" swap;
 
   set "pr-str" pr_str;
   set "str" str;

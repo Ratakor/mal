@@ -16,5 +16,6 @@ let pr_str readably =
         |> List.to_string ~start:"{" ~stop:"}" ~sep:" " (fun (k, v) ->
             Printf.sprintf "%s %s" (aux k) (aux v))
     | T.Fn _ -> "#<function>"
+    | T.Atom x -> Printf.sprintf "(atom %s)" (aux !x)
   in
   aux
