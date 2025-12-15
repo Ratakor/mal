@@ -56,4 +56,5 @@ let rec equal a b =
       List.equal equal a b
   | Map a, Map b -> MalMap.equal equal a b
   | Fn a, Fn b -> Stdlib.(a == b)
+  | Atom a, Atom b -> equal !a !b
   | _ -> false

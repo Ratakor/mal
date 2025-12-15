@@ -1,13 +1,6 @@
 open Printf
 module T = Types.Types
 
-module ListTraverse = List.Traverse (struct
-  type 'a t = ('a, string) result
-
-  let return = Result.return
-  let ( >>= ) = Result.( >>= )
-end)
-
 let read str = Reader.read_str str
 
 let rec eval env ast =
@@ -40,7 +33,7 @@ let rec eval env ast =
       let* () = bind_pairs binds in
       eval sub_env body
   | T.List (T.Symbol "do" :: body) ->
-      ListTraverse.fold_m (fun _acc x -> eval env x) T.Nil body
+      Utils.ListTraverse.fold_m (fun _acc x -> eval env x) T.Nil body
   | T.List [ T.Symbol "if"; cond; then_expr; else_expr ] -> (
       eval env cond
       >>= function
@@ -74,10 +67,10 @@ let rec eval env ast =
       |> return
   | T.List (x :: xs) -> (
       match eval env x with
-      | Ok (T.Fn f) -> ListTraverse.map_m (eval env) xs >>= f
+      | Ok (T.Fn f) -> Utils.ListTraverse.map_m (eval env) xs >>= f
       | Ok _ -> Error (sprintf "'%s' is not callable" (Printer.pr_str true x))
       | Error e -> Error e)
-  | T.Vector xs -> ListTraverse.map_m (eval env) xs >|= Types.vector
+  | T.Vector xs -> Utils.ListTraverse.map_m (eval env) xs >|= Types.vector
   | T.Map xs ->
       Types.MalMap.fold
         (fun k v acc ->

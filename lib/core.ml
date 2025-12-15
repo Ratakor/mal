@@ -7,12 +7,30 @@ let equal = function
   | [ a; b ] -> Ok (T.Bool (Types.equal a b))
   | _ -> invalid_arg __FUNCTION__
 
-let arith_binary f = function
-  | [ T.Int a; T.Int b ] -> Ok (T.Int (f a b))
+let int_arith_fold f = function
+  | T.Int x :: xs ->
+      let open Result in
+      Utils.ListTraverse.fold_m
+        (fun acc -> function
+          | T.Int a -> Ok (f acc a)
+          | _ -> invalid_arg __FUNCTION__)
+        x xs
+      >|= Types.int
   | _ -> invalid_arg __FUNCTION__
 
 let int_cmp_binary f = function
   | [ T.Int a; T.Int b ] -> Ok (T.Bool (f a b))
+  | _ -> invalid_arg __FUNCTION__
+
+let div = function
+  | T.Int x :: xs ->
+      let open Result in
+      Utils.ListTraverse.fold_m
+        (fun acc -> function
+          | T.Int a -> ( try Ok (acc / a) with e -> of_exn e)
+          | _ -> invalid_arg __FUNCTION__)
+        x xs
+      >|= Types.int
   | _ -> invalid_arg __FUNCTION__
 
 let atom = function
@@ -110,10 +128,10 @@ let init env =
   set ">" (int_cmp_binary Int.( > ));
   set ">=" (int_cmp_binary Int.( >= ));
 
-  set "+" (arith_binary Int.( + ));
-  set "-" (arith_binary Int.( - ));
-  set "*" (arith_binary Int.( * ));
-  set "/" (arith_binary Int.( / ));
+  set "+" (int_arith_fold Int.( + ));
+  set "-" (int_arith_fold Int.( - ));
+  set "*" (int_arith_fold Int.( * ));
+  set "/" div;
 
   set "list" Fun.(Types.list %> Result.return);
   (* set "atom" Fun.(List.hd %> Types.atom %> Result.return); *)
