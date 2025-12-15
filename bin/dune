@@ -46,3 +46,10 @@
  (libraries mal containers)
  (flags
   (:standard -open Containers)))
+
+(executable
+ (public_name step7_quote)
+ (name step7_quote)
+ (libraries mal containers)
+ (flags
+  (:standard -open Containers)))
