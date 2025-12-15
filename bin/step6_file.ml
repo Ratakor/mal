@@ -66,10 +66,10 @@ let rec eval env ast =
       |> Types.fn
       |> return
   | T.List (x :: xs) -> (
-      match eval env x with
-      | Ok (T.Fn f) -> Utils.ListTraverse.map_m (eval env) xs >>= f.value
-      | Ok _ -> Error (sprintf "'%s' is not callable" (Printer.pr_str true x))
-      | Error e -> Error e)
+      eval env x
+      >>= function
+      | T.Fn { value = f; _ } -> Utils.ListTraverse.map_m (eval env) xs >>= f
+      | _ -> Error (sprintf "'%s' is not callable" (Printer.pr_str true x)))
   | T.Vector xs -> Utils.ListTraverse.map_m (eval env) xs >|= Types.vector
   | T.Map xs ->
       Types.MalMap.fold

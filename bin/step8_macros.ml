@@ -81,11 +81,20 @@ let rec eval env ast =
       |> return
   | T.List [ T.Symbol "quote"; ast ] -> Ok ast
   | T.List [ T.Symbol "quasiquote"; ast ] -> eval env (quasiquote ast)
+  | T.List [ T.Symbol "defmacro!"; T.Symbol key; expr ] -> (
+      eval env expr
+      >>= function
+      | T.Fn fn ->
+          let fn = T.Fn { fn with is_macro = true } in
+          Env.set key fn env;
+          Ok fn
+      | _ -> Error "'defmacro!' value must be a function")
   | T.List (x :: xs) -> (
-      match eval env x with
-      | Ok (T.Fn f) -> Utils.ListTraverse.map_m (eval env) xs >>= f.value
-      | Ok _ -> Error (sprintf "'%s' is not callable" (Printer.pr_str true x))
-      | Error e -> Error e)
+      eval env x
+      >>= function
+      | T.Fn { value = f; is_macro = true } -> f xs >>= eval env
+      | T.Fn { value = f; _ } -> Utils.ListTraverse.map_m (eval env) xs >>= f
+      | _ -> Error (sprintf "'%s' is not callable" (Printer.pr_str true x)))
   | T.Vector xs -> Utils.ListTraverse.map_m (eval env) xs >|= Types.vector
   | T.Map xs ->
       Types.MalMap.fold
