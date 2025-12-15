@@ -1,4 +1,4 @@
-module T = Types
+module T = Types.Types
 module Data = Map.Make (String)
 
 type env = {

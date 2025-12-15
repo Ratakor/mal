@@ -27,6 +27,8 @@ and MalMap : (Map.S with type key = MalValue.t) = Map.Make (MalValue)
 
 include Types
 
+let bool x = Types.Bool x
+let int x = Types.Int x
 let list x = Types.List x
 let vector x = Types.Vector x
 let map x = Types.Map x
@@ -39,3 +41,16 @@ let map_of_list x =
     | _ :: [] -> Error "Missing value in Map"
   in
   aux MalMap.empty x
+
+let rec equal a b =
+  match (a, b) with
+  | Nil, Nil -> true
+  | Bool a, Bool b -> Bool.equal a b
+  | Int a, Int b -> Int.equal a b
+  | String a, String b | Symbol a, Symbol b | Keyword a, Keyword b ->
+      String.equal a b
+  | List a, List b | List a, Vector b | Vector a, List b | Vector a, Vector b ->
+      List.equal equal a b
+  | Map a, Map b -> MalMap.equal equal a b
+  | Fn a, Fn b -> Stdlib.(a == b)
+  | _ -> false

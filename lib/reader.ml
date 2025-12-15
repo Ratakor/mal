@@ -1,4 +1,4 @@
-module T = Types
+module T = Types.Types
 
 let number_re = Str.regexp {|-?[0-9]+|}
 
@@ -42,15 +42,15 @@ and read_collection closing =
   aux []
 
 and read_list tokens =
-  Result.(read_collection ")" tokens >|= Pair.map_fst T.list)
+  Result.(read_collection ")" tokens >|= Pair.map_fst Types.list)
 
 and read_vector tokens =
-  Result.(read_collection "]" tokens >|= Pair.map_fst T.vector)
+  Result.(read_collection "]" tokens >|= Pair.map_fst Types.vector)
 
 and read_map tokens =
   let open Result in
   let* list, tokens = read_collection "}" tokens in
-  T.map_of_list list |> Result.map2 (fun m -> (m, tokens)) (fun e -> Some e)
+  Types.map_of_list list |> Result.map2 (fun m -> (m, tokens)) (fun e -> Some e)
 
 and read_atom = function
   | "nil" -> Ok T.Nil

@@ -1,4 +1,4 @@
-module T = Types
+module T = Types.Types
 
 let pr_str readably =
   let rec aux = function
@@ -11,7 +11,7 @@ let pr_str readably =
     | T.List x -> List.to_string ~start:"(" ~stop:")" ~sep:" " aux x
     | T.Vector x -> List.to_string ~start:"[" ~stop:"]" ~sep:" " aux x
     | T.Map x ->
-        T.MalMap.to_list x
+        Types.MalMap.to_list x
         (* |> List.rev *)
         |> List.to_string ~start:"{" ~stop:"}" ~sep:" " (fun (k, v) ->
             Printf.sprintf "%s %s" (aux k) (aux v))

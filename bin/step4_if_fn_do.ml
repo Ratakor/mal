@@ -1,5 +1,5 @@
 open Printf
-module T = Types
+module T = Types.Types
 
 module ListTraverse = List.Traverse (struct
   type 'a t = ('a, string) result
@@ -74,39 +74,26 @@ let rec eval env ast =
       | Ok (T.Fn f) -> ListTraverse.map_m (eval env) xs >>= f
       | Ok _ -> Error (sprintf "'%s' is not callable" (Printer.pr_str true x))
       | Error e -> Error e)
-  | T.Vector xs -> ListTraverse.map_m (eval env) xs >|= T.vector
+  | T.Vector xs -> ListTraverse.map_m (eval env) xs >|= Types.vector
   | T.Map xs ->
-      T.MalMap.fold
+      Types.MalMap.fold
         (fun k v acc ->
           let* acc = acc in
           (* let* k = eval env k in *)
           let* v = eval env v in
-          return (T.MalMap.add k v acc))
-        xs (Ok T.MalMap.empty)
-      >|= T.map
+          return (Types.MalMap.add k v acc))
+        xs (Ok Types.MalMap.empty)
+      >|= Types.map
   | x -> Ok x
 
 let print exp = Printer.pr_str true exp
 
-let repl_env =
-  let int_fn f =
-    T.Fn
-      (function
-      | [ T.Int a; T.Int b ] -> Ok (T.Int (f a b))
-      | _ -> Error "Invalid argument")
-  in
-  let env = Env.make None in
-  Env.set "+" (int_fn ( + )) env;
-  Env.set "-" (int_fn ( - )) env;
-  Env.set "*" (int_fn ( * )) env;
-  Env.set "/" (int_fn ( / )) env;
-  Env.set "DEBUG-EVAL" (T.Bool false) env;
-  env
-
 let rep str =
-  Result.(str |> read >|= eval repl_env >>= map_err Option.some >|= print)
+  Result.(str |> read >|= eval Core.ns >>= map_err Option.some >|= print)
 
 let () =
+  Core.init Core.ns;
+
   try
     while true do
       printf "user> %!";
