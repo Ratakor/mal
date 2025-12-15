@@ -56,6 +56,9 @@ let rec eval env ast =
       (fun exprs ->
         let sub_env = Env.make (Some env) in
         let rec bind_args = function
+          | [ T.Symbol "&"; T.Symbol name ], args ->
+              Env.set name (Types.List args) sub_env;
+              Ok ()
           | T.Symbol name :: names, arg :: args ->
               Env.set name arg sub_env;
               bind_args (names, args)
