@@ -90,21 +90,42 @@ let rec eval env ast =
   | x -> Ok x
 
 let print exp = Printer.pr_str true exp
-
-let rep str =
-  Result.(str |> read >|= eval Core.ns >>= map_err Option.some >|= print)
+let re str = Result.(str |> read >|= eval Core.ns >>= map_err Option.some)
+let rep str = Result.(str |> re >|= print)
 
 let () =
   Core.init Core.ns;
-  rep "(def! not (fn* (a) (if a false true)))" |> ignore;
 
-  try
-    while true do
-      printf "user> %!";
-      let line = read_line () in
-      match rep line with
-      | Ok x -> printf "%s\n%!" x
-      | Error None -> ()
-      | Error (Some x) -> printf "Error: %s\n%!" x
-    done
-  with End_of_file -> print_newline ()
+  Env.set "*ARGV*"
+    (T.List
+       (if Array.length Sys.argv > 1 then
+          Sys.argv |> Array.to_list |> List.drop 2 |> List.map Types.string
+        else []))
+    Core.ns;
+
+  Env.set "eval"
+    (T.Fn
+       (function
+       | [ ast ] -> eval Core.ns ast (* TODO: no ns *)
+       | _ -> Error "Invalid argument"))
+    Core.ns;
+
+  re {|(def! not (fn* (a) (if a false true)))|} |> ignore;
+
+  re
+    {|(def! load-file (fn* (f) (eval (read-string (str "(do " (slurp f) "\nnil)")))))|}
+  |> ignore;
+
+  if Array.length Sys.argv > 1 then
+    re (sprintf {|(load-file "%s")|} Sys.argv.(1)) |> ignore
+  else
+    try
+      while true do
+        printf "user> %!";
+        let line = read_line () in
+        match rep line with
+        | Ok x -> printf "%s\n%!" x
+        | Error None -> ()
+        | Error (Some x) -> printf "Error: %s\n%!" x
+      done
+    with End_of_file -> print_newline ()
