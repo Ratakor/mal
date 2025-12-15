@@ -55,6 +55,21 @@ let swap = function
       Ok v
   | _ -> invalid_arg __FUNCTION__
 
+let cons = function
+  | [ x; T.List xs ] | [ x; T.Vector xs ] -> Ok (T.List (x :: xs))
+  | _ -> invalid_arg __FUNCTION__
+
+let concat arg =
+  let open Result in
+  let rec aux = function
+    | [] -> Ok []
+    | T.List x :: xs | T.Vector x :: xs ->
+        let* xs = aux xs in
+        Ok (x @ xs)
+    | _ -> invalid_arg __FUNCTION__
+  in
+  aux arg >|= Types.list
+
 let pr_str_list sep readably xs =
   String.concat sep (List.map (Printer.pr_str readably) xs)
 
@@ -113,6 +128,9 @@ let init env =
   set "deref" deref;
   set "reset!" reset;
   set "swap!" swap;
+
+  set "cons" cons;
+  set "concat" concat;
 
   set "pr-str" pr_str;
   set "str" str;
