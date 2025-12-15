@@ -32,3 +32,10 @@
  (libraries mal containers)
  (flags
   (:standard -open Containers)))
+
+(executable
+ (public_name step5_tco)
+ (name step5_tco)
+ (libraries mal containers)
+ (flags
+  (:standard -open Containers)))
