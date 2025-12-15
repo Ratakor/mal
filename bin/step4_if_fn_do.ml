@@ -93,6 +93,7 @@ let rep str =
 
 let () =
   Core.init Core.ns;
+  rep "(def! not (fn* (a) (if a false true)))" |> ignore;
 
   try
     while true do
