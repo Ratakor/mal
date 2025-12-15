@@ -39,3 +39,10 @@
  (libraries mal containers)
  (flags
   (:standard -open Containers)))
+
+(executable
+ (public_name step6_file)
+ (name step6_file)
+ (libraries mal containers)
+ (flags
+  (:standard -open Containers)))
