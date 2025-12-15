@@ -1,12 +1,5 @@
 open Printf
-module T = Types
-
-module TraverseList = List.Traverse (struct
-  type 'a t = ('a, string) result
-
-  let return = Result.return
-  let ( >>= ) = Result.( >>= )
-end)
+module T = Types.Types
 
 let read str = Reader.read_str str
 
@@ -42,27 +35,26 @@ let rec eval env ast =
       eval sub_env body
   | T.List (x :: xs) -> (
       match eval env x with
-      | Ok (T.Fn f) -> TraverseList.map_m (eval env) xs >>= f
+      | Ok (T.Fn f) -> Utils.ListTraverse.map_m (eval env) xs >>= f.value
       | Ok _ -> Error (sprintf "'%s' is not callable" (Printer.pr_str true x))
       | Error e -> Error e)
-  | T.Vector xs -> TraverseList.map_m (eval env) xs >|= T.vector
+  | T.Vector xs -> Utils.ListTraverse.map_m (eval env) xs >|= Types.vector
   | T.Map xs ->
-      T.MalMap.fold
+      Types.MalMap.fold
         (fun k v acc ->
           let* acc = acc in
           (* let* k = eval env k in *)
           let* v = eval env v in
-          return (T.MalMap.add k v acc))
-        xs (Ok T.MalMap.empty)
-      >|= T.map
+          return (Types.MalMap.add k v acc))
+        xs (Ok Types.MalMap.empty)
+      >|= Types.map
   | x -> Ok x
 
 let print exp = Printer.pr_str true exp
 
 let repl_env =
   let int_fn f =
-    T.Fn
-      (function
+    Types.fn (function
       | [ T.Int a; T.Int b ] -> Ok (T.Int (f a b))
       | _ -> Error "Invalid argument")
   in

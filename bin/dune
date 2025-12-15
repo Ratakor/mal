@@ -53,3 +53,10 @@
  (libraries mal containers)
  (flags
   (:standard -open Containers)))
+
+(executable
+ (public_name step8_macros)
+ (name step8_macros)
+ (libraries mal containers)
+ (flags
+  (:standard -open Containers)))

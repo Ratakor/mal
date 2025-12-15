@@ -67,7 +67,7 @@ let rec eval env ast =
       |> return
   | T.List (x :: xs) -> (
       match eval env x with
-      | Ok (T.Fn f) -> Utils.ListTraverse.map_m (eval env) xs >>= f
+      | Ok (T.Fn f) -> Utils.ListTraverse.map_m (eval env) xs >>= f.value
       | Ok _ -> Error (sprintf "'%s' is not callable" (Printer.pr_str true x))
       | Error e -> Error e)
   | T.Vector xs -> Utils.ListTraverse.map_m (eval env) xs >|= Types.vector

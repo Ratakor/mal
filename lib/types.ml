@@ -9,7 +9,10 @@ module rec Types : sig
     | List of t list
     | Vector of t list
     | Map of t MalMap.t
-    | Fn of (t list -> (t, string) result)
+    | Fn of {
+        value : t list -> (t, string) result;
+        is_macro : bool;
+      }
     | Atom of t ref
 end =
   Types
@@ -34,7 +37,7 @@ let string x = Types.String x
 let list x = Types.List x
 let vector x = Types.Vector x
 let map x = Types.Map x
-let fn x = Types.Fn x
+let fn x = Types.Fn { value = x; is_macro = false }
 let atom x = Types.Atom (ref x)
 
 let map_of_list x =
@@ -55,6 +58,7 @@ let rec equal a b =
   | List a, List b | List a, Vector b | Vector a, List b | Vector a, Vector b ->
       List.equal equal a b
   | Map a, Map b -> MalMap.equal equal a b
-  | Fn a, Fn b -> Stdlib.(a == b)
+  | Fn { value = a; is_macro = ma }, Fn { value = b; is_macro = mb } ->
+      Bool.equal ma mb && Stdlib.(a == b)
   | Atom a, Atom b -> equal !a !b
   | _ -> false

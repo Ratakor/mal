@@ -70,7 +70,7 @@ let reset = function
   | _ -> invalid_arg __FUNCTION__
 
 let swap = function
-  | T.Atom x :: T.Fn f :: args ->
+  | T.Atom x :: T.Fn { value = f; _ } :: args ->
       let open Result in
       let* v = f (!x :: args) in
       x := v;
@@ -123,7 +123,7 @@ let slurp = function
   | _ -> invalid_arg __FUNCTION__
 
 let init env =
-  let set s f = Env.set s (T.Fn f) env in
+  let set s f = Env.set s (Types.fn f) env in
 
   set "=" equal;
 
