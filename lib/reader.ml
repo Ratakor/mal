@@ -19,7 +19,12 @@ let is_comment s = Char.(s.[0] = ';')
 let is_int_literal s = Str.string_match number_re s 0
 let is_string_literal s = Char.(s.[0] = '"')
 let is_keyword_literal s = Char.(s.[0] = ':')
-let unescaped s = Scanf.sscanf s "%S%!" (fun x -> x)
+
+let unescaped s =
+  try Ok (Scanf.sscanf s "%S%!" Fun.id)
+  with e -> Error (Some (Printexc.to_string e))
+
+let unbalanced_msg closing = Printf.sprintf "Expected '%s', got EOF" closing
 
 let rec read_form = function
   | [] -> Error None
@@ -31,11 +36,11 @@ let rec read_form = function
 
 and read_collection closing =
   let rec aux acc = function
-    | [] -> Error (Some ("Unmatched " ^ closing))
+    | [] -> Error (Some (unbalanced_msg closing))
     | x :: tokens when String.(x = closing) -> Ok (List.rev acc, tokens)
     | tokens -> (
         match read_form tokens with
-        | Error None -> Error (Some ("Unmatched " ^ closing))
+        | Error None -> Error (Some (unbalanced_msg closing))
         | Error x -> Error x
         | Ok (form, tokens) -> aux (form :: acc) tokens)
   in
@@ -57,10 +62,7 @@ and read_atom = function
   | "true" -> Ok (T.Bool true)
   | "false" -> Ok (T.Bool false)
   | x when is_int_literal x -> Ok (T.Int (int_of_string x))
-  | x when is_string_literal x ->
-      let len = String.length x in
-      if len = 1 || Char.(x.[len - 1] <> '"') then Error (Some "Unmatched \"")
-      else Ok (T.String (unescaped x))
+  | x when is_string_literal x -> Result.(unescaped x >|= Types.string)
   | x when is_keyword_literal x ->
       Ok (T.Keyword (String.sub x 1 (String.length x - 1)))
   | x -> Ok (T.Symbol x)
@@ -73,4 +75,5 @@ let read_str str =
   >>= fun (form, tokens) ->
   match tokens with
   | [] -> return form
-  | _ -> fail (Some ("Remaining tokens: " ^ List.to_string (fun x -> x) tokens))
+  | x :: _ when is_comment x -> return form
+  | _ -> fail (Some ("Remaining tokens: " ^ List.to_string Fun.id tokens))

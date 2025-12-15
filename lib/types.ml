@@ -29,6 +29,7 @@ include Types
 
 let bool x = Types.Bool x
 let int x = Types.Int x
+let string x = Types.String x
 let list x = Types.List x
 let vector x = Types.Vector x
 let map x = Types.Map x

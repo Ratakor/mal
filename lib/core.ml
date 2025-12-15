@@ -39,6 +39,7 @@ let is_empty = function
 
 let count = function
   | [ T.List xs ] | [ T.Vector xs ] -> Ok (T.Int (List.length xs))
+  (* | [ T.Nil ] -> Ok (T.Int 0) *)
   | _ -> Error "Invalid argument"
 
 let init env =
