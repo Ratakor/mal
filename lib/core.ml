@@ -50,6 +50,22 @@ let is_atom = function
   | [ T.Atom _ ] -> Ok (T.Bool true)
   | _ -> Ok (T.Bool false)
 
+let is_nil = function
+  | [ T.Nil ] -> Ok (T.Bool true)
+  | _ -> Ok (T.Bool false)
+
+let is_true = function
+  | [ T.Bool true ] -> Ok (T.Bool true)
+  | _ -> Ok (T.Bool false)
+
+let is_false = function
+  | [ T.Bool false ] -> Ok (T.Bool true)
+  | _ -> Ok (T.Bool false)
+
+let is_symbol = function
+  | [ T.Symbol _ ] -> Ok (T.Bool true)
+  | _ -> Ok (T.Bool false)
+
 let is_empty = function
   | [ T.List [] ] | [ T.Vector [] ] -> Ok (T.Bool true)
   | [ T.List _ ] | [ T.Vector _ ] -> Ok (T.Bool false)
@@ -185,6 +201,10 @@ let init env =
 
   set "list?" is_list;
   set "atom?" is_atom;
+  set "nil?" is_nil;
+  set "true?" is_true;
+  set "false?" is_false;
+  set "symbol?" is_symbol;
 
   set "empty?" is_empty;
   set "count" count;
