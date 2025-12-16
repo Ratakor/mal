@@ -128,10 +128,17 @@ let () =
       | _ -> Error "Invalid argument"))
     Core.ns;
 
-  re {|(def! not (fn* (a) (if a false true)))|} |> ignore;
+  re "(def! not (fn* (a) (if a false true)))" |> ignore;
 
   re
-    {|(def! load-file (fn* (f) (eval (read-string (str "(do " (slurp f) "\nnil)")))))|}
+    "(def! load-file (fn* (f) (eval (read-string (str \"(do \" (slurp f) \"\n\
+     nil)\")))))"
+  |> ignore;
+
+  re
+    "(defmacro! cond (fn* (& xs) (if (> (count xs) 0) (list 'if (first xs) (if \
+     (> (count xs) 1) (nth xs 1) (throw \"odd number of forms to cond\")) \
+     (cons 'cond (rest (rest xs)))))))"
   |> ignore;
 
   if Array.length Sys.argv > 1 then

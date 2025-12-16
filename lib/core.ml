@@ -1,7 +1,7 @@
 module T = Types.Types
 
 let ns = Env.make None
-let invalid_arg fn_name = Error ("Invalid argument given to " ^ fn_name)
+let invalid_arg fn_name = Error (fn_name ^ ": Invalid argument")
 
 let equal = function
   | [ a; b ] -> Ok (T.Bool (Types.equal a b))
@@ -27,7 +27,7 @@ let div = function
       let open Result in
       Utils.ListTraverse.fold_m
         (fun acc -> function
-          | T.Int a -> ( try Ok (acc / a) with e -> of_exn e)
+          | T.Int a -> ( try Ok (acc / a) with _ -> Error "Division by zero")
           | _ -> invalid_arg __FUNCTION__)
         x xs
       >|= Types.int
@@ -56,7 +56,43 @@ let is_empty = function
 
 let count = function
   | [ T.List xs ] | [ T.Vector xs ] -> Ok (T.Int (List.length xs))
-  (* | [ T.Nil ] -> Ok (T.Int 0) *)
+  | [ T.Nil ] -> Ok (T.Int 0)
+  | _ -> invalid_arg __FUNCTION__
+
+let cons = function
+  | [ x; T.List xs ] | [ x; T.Vector xs ] -> Ok (T.List (x :: xs))
+  | _ -> invalid_arg __FUNCTION__
+
+let concat arg =
+  let open Result in
+  let rec aux = function
+    | [] -> Ok []
+    | T.List x :: xs | T.Vector x :: xs ->
+        let* xs = aux xs in
+        Ok (x @ xs)
+    | _ -> invalid_arg __FUNCTION__
+  in
+  aux arg >|= Types.list
+
+let nth = function
+  | [ T.List xs; T.Int i ] | [ T.Vector xs; T.Int i ] -> (
+      try Ok (List.nth xs i) with _ -> Error "nth: index out of range")
+  | _ -> invalid_arg __FUNCTION__
+
+let first = function
+  | [ T.List xs ] | [ T.Vector xs ] -> (
+      match xs with
+      | [] -> Ok T.Nil
+      | x :: _ -> Ok x)
+  | [ T.Nil ] -> Ok T.Nil
+  | _ -> invalid_arg __FUNCTION__
+
+let rest = function
+  | [ T.List xs ] | [ T.Vector xs ] -> (
+      match xs with
+      | [] -> Ok (T.List [])
+      | _ :: xs -> Ok (T.List xs))
+  | [ T.Nil ] -> Ok (T.List [])
   | _ -> invalid_arg __FUNCTION__
 
 let deref = function
@@ -76,21 +112,6 @@ let swap = function
       x := v;
       Ok v
   | _ -> invalid_arg __FUNCTION__
-
-let cons = function
-  | [ x; T.List xs ] | [ x; T.Vector xs ] -> Ok (T.List (x :: xs))
-  | _ -> invalid_arg __FUNCTION__
-
-let concat arg =
-  let open Result in
-  let rec aux = function
-    | [] -> Ok []
-    | T.List x :: xs | T.Vector x :: xs ->
-        let* xs = aux xs in
-        Ok (x @ xs)
-    | _ -> invalid_arg __FUNCTION__
-  in
-  aux arg >|= Types.list
 
 let pr_str_list sep readably xs =
   String.concat sep (List.map (Printer.pr_str readably) xs)
@@ -147,13 +168,15 @@ let init env =
 
   set "empty?" is_empty;
   set "count" count;
+  set "cons" cons;
+  set "concat" concat;
+  set "nth" nth;
+  set "first" first;
+  set "rest" rest;
 
   set "deref" deref;
   set "reset!" reset;
   set "swap!" swap;
-
-  set "cons" cons;
-  set "concat" concat;
 
   set "pr-str" pr_str;
   set "str" str;
