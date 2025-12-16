@@ -96,6 +96,23 @@ let rest = function
   | [ T.Nil ] -> Ok (T.List [])
   | _ -> invalid_arg __FUNCTION__
 
+let apply = function
+  | T.Fn _ :: [] -> invalid_arg __FUNCTION__
+  | T.Fn { value = f; _ } :: xs ->
+      let[@tail_mod_cons] rec aux = function
+        | [] -> []
+        | [ T.List x ] | [ T.Vector x ] -> x
+        | x :: xs -> x :: aux xs
+      in
+      f (aux xs)
+  | _ -> invalid_arg __FUNCTION__
+
+let map = function
+  | [ T.Fn { value = f; _ }; T.List xs ]
+  | [ T.Fn { value = f; _ }; T.Vector xs ] ->
+      Result.(Types.Traverse.map_m Fun.(List.pure %> f) xs >|= Types.list)
+  | _ -> invalid_arg __FUNCTION__
+
 let deref = function
   | [ T.Atom x ] -> Ok !x
   | _ -> invalid_arg __FUNCTION__
@@ -176,6 +193,8 @@ let init env =
   set "nth" nth;
   set "first" first;
   set "rest" rest;
+  set "apply" apply;
+  set "map" map;
 
   set "deref" deref;
   set "reset!" reset;

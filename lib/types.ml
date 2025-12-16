@@ -47,8 +47,6 @@ let map x = Types.Map x
 let fn x = Types.Fn { value = x; is_macro = false }
 let atom x = Types.Atom (ref x)
 let errstr x = Error (Types.String x)
-let errstr' x = Error (Types.String (Printer.pr_str false x))
-let errexc x = Error (Types.String (Printexc.to_string x))
 
 let map_of_list x =
   let rec aux acc = function
