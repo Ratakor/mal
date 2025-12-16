@@ -22,13 +22,13 @@ let is_keyword_literal s = Char.(s.[0] = ':')
 
 let unescaped s =
   try Ok (Scanf.sscanf s "%S%!" Fun.id)
-  with e -> Error (Some (Printexc.to_string e))
+  with e -> Types.errstr (Printexc.to_string e)
 
 let unexpected_eof expected =
-  Error (Some (Printf.sprintf "Expected '%s', got EOF" expected))
+  Types.errstr (Printf.sprintf "Expected '%s', got EOF" expected)
 
 let rec read_form = function
-  | [] -> Error None
+  | [] -> Error T.Nil
   | x :: tokens when is_comment x -> read_form tokens
   | "(" :: tokens -> read_list tokens
   | "[" :: tokens -> read_vector tokens
@@ -46,7 +46,7 @@ and read_collection closing =
     | x :: tokens when String.(x = closing) -> Ok (List.rev acc, tokens)
     | tokens -> (
         match read_form tokens with
-        | Error None -> unexpected_eof closing
+        | Error T.Nil -> unexpected_eof closing
         | Error _ as err -> err
         | Ok (form, tokens) -> aux (form :: acc) tokens)
   in
@@ -61,11 +61,12 @@ and read_vector tokens =
 and read_map tokens =
   let open Result in
   let* list, tokens = read_collection "}" tokens in
-  Types.map_of_list list |> Result.map2 (fun m -> (m, tokens)) (fun e -> Some e)
+  let+ map = Types.map_of_list list in
+  (map, tokens)
 
 and read_quote symbol tokens =
   match read_form tokens with
-  | Error None -> unexpected_eof "expr"
+  | Error T.Nil -> unexpected_eof "expr"
   | Error _ as err -> err
   | Ok (form, tokens) -> Ok (T.List [ T.Symbol symbol; form ], tokens)
 
@@ -88,4 +89,4 @@ let read_str str =
   match tokens with
   | [] -> return form
   | x :: _ when is_comment x -> return form
-  | _ -> fail (Some ("Remaining tokens: " ^ List.to_string Fun.id tokens))
+  | _ -> Types.errstr ("Remaining tokens: " ^ List.to_string Fun.id tokens)

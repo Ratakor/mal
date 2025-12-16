@@ -1,7 +1,7 @@
 module T = Types.Types
 
 let ns = Env.make None
-let invalid_arg fn_name = Error (fn_name ^ ": Invalid argument")
+let invalid_arg fn_name = Types.errstr (fn_name ^ ": Invalid argument")
 
 let equal = function
   | [ a; b ] -> Ok (T.Bool (Types.equal a b))
@@ -10,7 +10,7 @@ let equal = function
 let int_arith_fold f = function
   | T.Int x :: xs ->
       let open Result in
-      Utils.ListTraverse.fold_m
+      Types.Traverse.fold_m
         (fun acc -> function
           | T.Int a -> Ok (f acc a)
           | _ -> invalid_arg __FUNCTION__)
@@ -25,9 +25,10 @@ let int_cmp_binary f = function
 let div = function
   | T.Int x :: xs ->
       let open Result in
-      Utils.ListTraverse.fold_m
+      Types.Traverse.fold_m
         (fun acc -> function
-          | T.Int a -> ( try Ok (acc / a) with _ -> Error "Division by zero")
+          | T.Int a -> (
+              try Ok (acc / a) with _ -> Types.errstr "Division by zero")
           | _ -> invalid_arg __FUNCTION__)
         x xs
       >|= Types.int
@@ -76,7 +77,7 @@ let concat arg =
 
 let nth = function
   | [ T.List xs; T.Int i ] | [ T.Vector xs; T.Int i ] -> (
-      try Ok (List.nth xs i) with _ -> Error "nth: index out of range")
+      try Ok (List.nth xs i) with _ -> Types.errstr "nth: index out of range")
   | _ -> invalid_arg __FUNCTION__
 
 let first = function
@@ -113,6 +114,10 @@ let swap = function
       Ok v
   | _ -> invalid_arg __FUNCTION__
 
+let throw = function
+  | [ x ] -> Error x
+  | _ -> invalid_arg __FUNCTION__
+
 let pr_str_list sep readably xs =
   String.concat sep (List.map (Printer.pr_str readably) xs)
 
@@ -132,15 +137,14 @@ let read_string = function
       Reader.read_str s
       |> function
       | Ok _ as ok -> ok
-      | Error None -> Ok T.Nil
-      | Error (Some x) -> Error x)
+      | Error T.Nil -> Ok T.Nil
+      | Error x -> Types.errstr (Printer.pr_str false x))
   | _ -> invalid_arg __FUNCTION__
 
 let slurp = function
-  | [ T.String filename ] ->
-      let open Result in
-      (try Ok IO.(with_in filename read_all) with e -> of_exn e)
-      >>= Fun.(Types.string %> return)
+  | [ T.String filename ] -> (
+      try Ok (T.String IO.(with_in filename read_all))
+      with e -> Types.errstr (Printexc.to_string e))
   | _ -> invalid_arg __FUNCTION__
 
 let init env =
@@ -159,7 +163,6 @@ let init env =
   set "/" div;
 
   set "list" Fun.(Types.list %> Result.return);
-  (* set "atom" Fun.(List.hd %> Types.atom %> Result.return); *)
   set "atom" atom;
   set "vec" vec;
 
@@ -177,6 +180,8 @@ let init env =
   set "deref" deref;
   set "reset!" reset;
   set "swap!" swap;
+
+  set "throw" throw;
 
   set "pr-str" pr_str;
   set "str" str;

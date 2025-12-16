@@ -27,7 +27,7 @@ let rec eval env ast =
   | T.Symbol x -> (
       match Env.get x env with
       | Some v -> Ok v
-      | None -> Error (sprintf "'%s' not found" x))
+      | None -> Types.errstr (sprintf "'%s' not found" x))
   | T.List [ T.Symbol "def!"; T.Symbol key; expr ] ->
       let* value = eval env expr in
       Env.set key value env;
@@ -40,14 +40,15 @@ let rec eval env ast =
             let* value = eval sub_env expr in
             Env.set key value sub_env;
             bind_pairs tail
-        | _ :: _ :: _ -> Error "'let*' keys must be symbols"
-        | _ :: [] -> Error "'let*' bindings must be an even number of elements"
+        | _ :: _ :: _ -> Types.errstr "'let*' keys must be symbols"
+        | _ :: [] ->
+            Types.errstr "'let*' bindings must be an even number of elements"
         | [] -> Ok ()
       in
       let* () = bind_pairs binds in
       eval sub_env body
   | T.List (T.Symbol "do" :: body) ->
-      Utils.ListTraverse.fold_m (fun _acc x -> eval env x) T.Nil body
+      Types.Traverse.fold_m (fun _acc x -> eval env x) T.Nil body
   | T.List [ T.Symbol "if"; cond; then_expr; else_expr ] -> (
       eval env cond
       >>= function
@@ -71,7 +72,7 @@ let rec eval env ast =
               bind_args (names, args)
           | [], [] -> Ok ()
           | _ ->
-              Error
+              Types.errstr
                 (sprintf "Expected %d args, got %d" (List.length binds)
                    (List.length exprs))
         in
@@ -88,14 +89,27 @@ let rec eval env ast =
           let fn = T.Fn { fn with is_macro = true } in
           Env.set key fn env;
           Ok fn
-      | _ -> Error "'defmacro!' value must be a function")
+      | _ -> Types.errstr "'defmacro!' value must be a function")
+  | T.List
+      [
+        T.Symbol "try*";
+        try_expr;
+        T.List [ T.Symbol "catch*"; T.Symbol bind; catch_expr ];
+      ] -> (
+      match eval env try_expr with
+      | Ok _ as ok -> ok
+      | Error err ->
+          let sub_env = Env.make (Some env) in
+          Env.set bind err sub_env;
+          eval sub_env catch_expr)
   | T.List (x :: xs) -> (
       eval env x
       >>= function
       | T.Fn { value = f; is_macro = true } -> f xs >>= eval env
-      | T.Fn { value = f; _ } -> Utils.ListTraverse.map_m (eval env) xs >>= f
-      | _ -> Error (sprintf "'%s' is not callable" (Printer.pr_str true x)))
-  | T.Vector xs -> Utils.ListTraverse.map_m (eval env) xs >|= Types.vector
+      | T.Fn { value = f; _ } -> Types.Traverse.map_m (eval env) xs >>= f
+      | _ ->
+          Types.errstr (sprintf "'%s' is not callable" (Printer.pr_str true x)))
+  | T.Vector xs -> Types.Traverse.map_m (eval env) xs >|= Types.vector
   | T.Map xs ->
       Types.MalMap.fold
         (fun k v acc ->
@@ -109,7 +123,7 @@ let rec eval env ast =
 
 let read str = Reader.read_str str
 let print exp = Printer.pr_str true exp
-let re str = Result.(str |> read >|= eval Core.ns >>= map_err Option.some)
+let re str = Result.(str |> read >>= eval Core.ns)
 let rep str = Result.(str |> re >|= print)
 
 let () =
@@ -125,7 +139,7 @@ let () =
   Env.set "eval"
     (Types.fn (function
       | [ ast ] -> eval Core.ns ast
-      | _ -> Error "Invalid argument"))
+      | _ -> Types.errstr "Invalid argument"))
     Core.ns;
 
   re "(def! not (fn* (a) (if a false true)))" |> ignore;
@@ -143,8 +157,8 @@ let () =
 
   if Array.length Sys.argv > 1 then
     match re (sprintf {|(load-file "%s")|} Sys.argv.(1)) with
-    | Error (Some x) -> printf "Error: %s\n%!" x
-    | _ -> ()
+    | Ok _ | Error T.Nil -> ()
+    | Error x -> printf "Error: %s\n%!" (Printer.pr_str false x)
   else
     try
       while true do
@@ -152,7 +166,7 @@ let () =
         let line = read_line () in
         match rep line with
         | Ok x -> printf "%s\n%!" x
-        | Error None -> ()
-        | Error (Some x) -> printf "Error: %s\n%!" x
+        | Error T.Nil -> ()
+        | Error x -> printf "Error: %s\n%!" (Printer.pr_str false x)
       done
     with End_of_file -> print_newline ()

@@ -10,7 +10,7 @@ module rec Types : sig
     | Vector of t list
     | Map of t MalMap.t
     | Fn of {
-        value : t list -> (t, string) result;
+        value : t list -> (t, t) result;
         is_macro : bool;
       }
     | Atom of t ref
@@ -31,6 +31,13 @@ and MalMap : (Map.S with type key = MalValue.t) = Map.Make (MalValue)
 
 include Types
 
+module Traverse = List.Traverse (struct
+  type 'a t = ('a, Types.t) result
+
+  let return = Result.return
+  let ( >>= ) = Result.( >>= )
+end)
+
 let bool x = Types.Bool x
 let int x = Types.Int x
 let string x = Types.String x
@@ -39,12 +46,15 @@ let vector x = Types.Vector x
 let map x = Types.Map x
 let fn x = Types.Fn { value = x; is_macro = false }
 let atom x = Types.Atom (ref x)
+let errstr x = Error (Types.String x)
+let errstr' x = Error (Types.String (Printer.pr_str false x))
+let errexc x = Error (Types.String (Printexc.to_string x))
 
 let map_of_list x =
   let rec aux acc = function
     | [] -> Ok (Types.Map acc)
     | k :: v :: xs -> aux (MalMap.add k v acc) xs
-    | _ :: [] -> Error "Missing value in Map"
+    | _ :: [] -> errstr "Missing value in Map"
   in
   aux MalMap.empty x
 
