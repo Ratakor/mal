@@ -52,7 +52,7 @@ let map_of_list x =
   let rec aux acc = function
     | [] -> Ok (Types.Map acc)
     | k :: v :: xs -> aux (MalMap.add k v acc) xs
-    | _ :: [] -> errstr "Missing value in Map"
+    | _ :: [] -> errstr "Missing value in HashMap"
   in
   aux MalMap.empty x
 

@@ -139,7 +139,7 @@ let () =
   Env.set "eval"
     (Types.fn (function
       | [ ast ] -> eval Core.ns ast
-      | _ -> Types.errstr "Invalid argument"))
+      | xs -> Core.invalid_num_args "eval" xs))
     Core.ns;
 
   re "(def! not (fn* (a) (if a false true)))" |> ignore;
