@@ -1,37 +1,81 @@
 module T = Types.Types
 
 let ns = Env.make None
-let invalid_arg fn_name = Types.errstr (fn_name ^ ": Invalid argument")
 
-let equal = function
+(* TODO: use when appropriated *)
+let invalid_num_args fn args =
+  Printf.sprintf "Wrong number of args (%d) passed to: %s" (List.length args) fn
+  |> Types.errstr
+
+let invalid_arg fn = Types.errstr ("Invalid argument passed to: " ^ fn)
+
+let ( = ) = function
   | [ a; b ] -> Ok (T.Bool (Types.equal a b))
-  | _ -> invalid_arg __FUNCTION__
+  | xs -> invalid_num_args __FUNCTION__ xs
 
-let int_arith_fold f = function
+let ( + ) = function
   | T.Int x :: xs ->
       let open Result in
       Types.Traverse.fold_m
         (fun acc -> function
-          | T.Int a -> Ok (f acc a)
+          | T.Int a -> Ok Int.(acc + a)
           | _ -> invalid_arg __FUNCTION__)
         x xs
       >|= Types.int
+  | [] -> invalid_num_args __FUNCTION__ []
   | _ -> invalid_arg __FUNCTION__
 
-let int_cmp_binary f = function
-  | [ T.Int a; T.Int b ] -> Ok (T.Bool (f a b))
+let ( - ) = function
+  | T.Int x :: xs ->
+      let open Result in
+      Types.Traverse.fold_m
+        (fun acc -> function
+          | T.Int a -> Ok Int.(acc - a)
+          | _ -> invalid_arg __FUNCTION__)
+        x xs
+      >|= Types.int
+  | [] -> invalid_num_args __FUNCTION__ []
   | _ -> invalid_arg __FUNCTION__
 
-let div = function
+let ( * ) = function
+  | T.Int x :: xs ->
+      let open Result in
+      Types.Traverse.fold_m
+        (fun acc -> function
+          | T.Int a -> Ok Int.(acc * a)
+          | _ -> invalid_arg __FUNCTION__)
+        x xs
+      >|= Types.int
+  | [] -> invalid_num_args __FUNCTION__ []
+  | _ -> invalid_arg __FUNCTION__
+
+let ( / ) = function
   | T.Int x :: xs ->
       let open Result in
       Types.Traverse.fold_m
         (fun acc -> function
           | T.Int a -> (
-              try Ok (acc / a) with _ -> Types.errstr "Division by zero")
+              try Ok Int.(acc / a) with _ -> Types.errstr "Division by zero")
           | _ -> invalid_arg __FUNCTION__)
         x xs
       >|= Types.int
+  | [] -> invalid_num_args __FUNCTION__ []
+  | _ -> invalid_arg __FUNCTION__
+
+let ( < ) = function
+  | [ T.Int a; T.Int b ] -> Ok (T.Bool Int.(a < b))
+  | _ -> invalid_arg __FUNCTION__
+
+let ( <= ) = function
+  | [ T.Int a; T.Int b ] -> Ok (T.Bool Int.(a <= b))
+  | _ -> invalid_arg __FUNCTION__
+
+let ( > ) = function
+  | [ T.Int a; T.Int b ] -> Ok (T.Bool Int.(a > b))
+  | _ -> invalid_arg __FUNCTION__
+
+let ( >= ) = function
+  | [ T.Int a; T.Int b ] -> Ok (T.Bool Int.(a >= b))
   | _ -> invalid_arg __FUNCTION__
 
 let atom = function
@@ -42,34 +86,58 @@ let vec = function
   | [ T.List xs ] | [ T.Vector xs ] -> Ok (T.Vector xs)
   | _ -> invalid_arg __FUNCTION__
 
+let symbol = function
+  | [ T.String x ] -> Ok (T.Symbol x)
+  | _ -> invalid_arg __FUNCTION__
+
+let keyword = function
+  | [ T.String x ] | [ T.Keyword x ] -> Ok (T.Keyword x)
+  | _ -> invalid_arg __FUNCTION__
+
 let is_list = function
   | [ T.List _ ] -> Ok (T.Bool true)
-  | _ -> Ok (T.Bool false)
+  | [ _ ] -> Ok (T.Bool false)
+  | _ -> invalid_arg "Core.list?"
 
 let is_atom = function
   | [ T.Atom _ ] -> Ok (T.Bool true)
-  | _ -> Ok (T.Bool false)
+  | [ _ ] -> Ok (T.Bool false)
+  | _ -> invalid_arg "Core.atom?"
 
 let is_nil = function
   | [ T.Nil ] -> Ok (T.Bool true)
-  | _ -> Ok (T.Bool false)
+  | [ _ ] -> Ok (T.Bool false)
+  | _ -> invalid_arg "Core.nil?"
 
 let is_true = function
   | [ T.Bool true ] -> Ok (T.Bool true)
-  | _ -> Ok (T.Bool false)
+  | [ _ ] -> Ok (T.Bool false)
+  | _ -> invalid_arg "Core.true?"
 
 let is_false = function
   | [ T.Bool false ] -> Ok (T.Bool true)
-  | _ -> Ok (T.Bool false)
+  | [ _ ] -> Ok (T.Bool false)
+  | _ -> invalid_arg "Core.false?"
 
 let is_symbol = function
   | [ T.Symbol _ ] -> Ok (T.Bool true)
-  | _ -> Ok (T.Bool false)
+  | [ _ ] -> Ok (T.Bool false)
+  | _ -> invalid_arg "Core.symbol?"
+
+let is_keyword = function
+  | [ T.Keyword _ ] -> Ok (T.Bool true)
+  | [ _ ] -> Ok (T.Bool false)
+  | _ -> invalid_arg "Core.keyword?"
+
+let is_vector = function
+  | [ T.Vector _ ] -> Ok (T.Bool true)
+  | [ _ ] -> Ok (T.Bool false)
+  | _ -> invalid_arg "Core.vector?"
 
 let is_empty = function
   | [ T.List [] ] | [ T.Vector [] ] -> Ok (T.Bool true)
   | [ T.List _ ] | [ T.Vector _ ] -> Ok (T.Bool false)
-  | _ -> invalid_arg __FUNCTION__
+  | _ -> invalid_arg "Core.empty?"
 
 let count = function
   | [ T.List xs ] | [ T.Vector xs ] -> Ok (T.Int (List.length xs))
@@ -183,30 +251,45 @@ let slurp = function
 let init env =
   let set s f = Env.set s (Types.fn f) env in
 
-  set "=" equal;
+  set "=" ( = );
 
-  set "<" (int_cmp_binary Int.( < ));
-  set "<=" (int_cmp_binary Int.( <= ));
-  set ">" (int_cmp_binary Int.( > ));
-  set ">=" (int_cmp_binary Int.( >= ));
+  set "<" ( < );
+  set "<=" ( <= );
+  set ">" ( > );
+  set ">=" ( >= );
 
-  set "+" (int_arith_fold Int.( + ));
-  set "-" (int_arith_fold Int.( - ));
-  set "*" (int_arith_fold Int.( * ));
-  set "/" div;
+  set "+" ( + );
+  set "-" ( - );
+  set "*" ( * );
+  set "/" ( / );
 
   set "list" Fun.(Types.list %> Result.return);
   set "atom" atom;
   set "vec" vec;
+  set "symbol" symbol;
+  set "keyword" keyword;
+  set "vector" Fun.(Types.vector %> Result.return);
 
+  (* set "hash-map" hash_map; *)
+  (* TODO *)
   set "list?" is_list;
   set "atom?" is_atom;
   set "nil?" is_nil;
   set "true?" is_true;
   set "false?" is_false;
   set "symbol?" is_symbol;
-
+  set "keyword?" is_keyword;
+  set "vector?" is_vector;
+  set "map?" (function
+    | [ T.Map _ ] -> Ok (T.Bool true)
+    | [ _ ] -> Ok (T.Bool false)
+    | _ -> invalid_arg "map?");
+  set "sequential?" (function
+    | [ T.List _ ] | [ T.Vector _ ] -> Ok (T.Bool true)
+    | [ _ ] -> Ok (T.Bool false)
+    | xs -> invalid_num_args "sequential?" xs);
   set "empty?" is_empty;
+
   set "count" count;
   set "cons" cons;
   set "concat" concat;
