@@ -97,10 +97,10 @@
           inputsFrom = [ main ];
           buildInputs =
             devPackages
-            ++ (with pkgs.ocamlPackages; [
-              ocamlformat
-              ocaml-lsp
-            ]);
+            ++ builtins.attrValues {
+              inherit (pkgs) rlwrap;
+              inherit (pkgs.ocamlPackages) ocamlformat ocaml-lsp;
+            };
         };
 
         formatter = treefmt.config.build.wrapper;
@@ -108,6 +108,15 @@
         checks = {
           formatting = treefmt.config.build.check self;
           # TODO: dune test
+        };
+
+        apps = {
+          # nix run .#repl
+          # requires to be in the default dev shell
+          repl = {
+            type = "app";
+            program = "${pkgs.writeShellScript "repl" "rlwrap dune exec stepA_mal"}";
+          };
         };
       }
     );
