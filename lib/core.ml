@@ -205,6 +205,23 @@ let map self = function
   | [ _; _ ] -> invalid_arg self
   | xs -> invalid_num_args self xs
 
+let conj self = function
+  | ([] | T.List _ :: [] | T.Vector _ :: []) as xs -> invalid_num_args self xs
+  | T.List x :: xs -> Ok (T.List (List.fold_left List.cons' x xs))
+  | T.Vector x :: xs -> Ok (T.Vector (x @ xs))
+  | _ :: _ -> invalid_arg self
+
+let seq self = function
+  | [ T.List [] ] | [ T.Vector [] ] | [ T.String "" ] | [ T.Nil ] -> Ok T.Nil
+  | [ T.List x ] | [ T.Vector x ] -> Ok (T.List x)
+  | [ T.String x ] ->
+      String.to_list x
+      |> List.map Fun.(String.make 1 %> Types.string)
+      |> Types.list
+      |> Result.return
+  | [ _ ] -> invalid_arg self
+  | xs -> invalid_num_args self xs
+
 let assoc self = function
   | T.Map m :: xs -> Types.map_of_list m xs
   | _ :: _ -> invalid_arg self
@@ -358,8 +375,8 @@ let init env =
   set "rest" rest;
   set "apply" apply;
   set "map" map;
-  (* set "conj" conj; *)
-  (* set "seq" seq; *)
+  set "conj" conj;
+  set "seq" seq;
 
   set "assoc" assoc;
   set "dissoc" dissoc;
