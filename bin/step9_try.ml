@@ -90,6 +90,7 @@ let rec eval env ast =
           Env.set key fn env;
           Ok fn
       | _ -> Types.errstr "'defmacro!' value must be a function")
+  | T.List [ T.Symbol "try*"; expr ] -> eval env expr
   | T.List
       [
         T.Symbol "try*";

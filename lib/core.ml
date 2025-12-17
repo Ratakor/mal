@@ -235,6 +235,7 @@ let dissoc self = function
 
 let get self = function
   | [ T.Map m; k ] -> Ok (Types.MalMap.get_or k m ~default:Nil)
+  | [ T.Nil; _ ] -> Ok (T.Nil)
   | [ _; _ ] -> invalid_arg self
   | xs -> invalid_num_args self xs
 
