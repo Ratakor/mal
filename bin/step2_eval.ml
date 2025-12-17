@@ -1,5 +1,5 @@
 open Printf
-module T = Types.Types
+module T = Types
 
 let read str = Reader.read_str str
 
@@ -7,20 +7,20 @@ let rec eval env ast =
   let open Result in
   (match Env.get "DEBUG-EVAL" env with
   | None | Some T.Nil | Some (T.Bool false) -> ()
-  | _ -> printf "EVAL: %s\n%!" (Printer.pr_str true ast));
+  | _ -> printf "EVAL: %s\n%!" (T.to_string true ast));
 
   match ast with
   | T.Symbol x -> (
       match Env.get x env with
       | Some v -> Ok v
-      | None -> Error (sprintf "'%s' not found" x))
-  | T.List (x :: xs) -> (
+      | None -> T.errstr (sprintf "'%s' not found" x))
+  | T.List (x :: xs, _) -> (
       match eval env x with
-      | Ok (T.Fn f) -> Utils.ListTraverse.map_m (eval env) xs >>= f.value
-      | Ok _ -> Error (sprintf "'%s' is not callable" (Printer.pr_str true x))
+      | Ok (T.Fn (f, _)) -> T.LT.map_m (eval env) xs >>= f
+      | Ok _ -> T.errstr (sprintf "'%s' is not callable" (T.to_string true x))
       | Error e -> Error e)
-  | T.Vector xs -> Utils.ListTraverse.map_m (eval env) xs >|= Types.vector
-  | T.Map xs ->
+  | T.Vector (xs, _) -> T.LT.map_m (eval env) xs >|= Types.vector
+  | T.Map (xs, _) ->
       Types.MalMap.fold
         (fun k v acc ->
           let* acc' = acc in
@@ -31,13 +31,13 @@ let rec eval env ast =
       >|= Types.map
   | x -> Ok x
 
-let print exp = Printer.pr_str true exp
+let print exp = T.to_string true exp
 
 let repl_env =
   let int_fn f =
     Types.fn (function
       | [ T.Int a; T.Int b ] -> Ok (T.Int (f a b))
-      | _ -> Error "Invalid argument")
+      | _ -> T.errstr "Invalid argument")
   in
   let env = Env.make None in
   Env.set "+" (int_fn ( + )) env;
@@ -48,16 +48,19 @@ let repl_env =
   env
 
 let rep str =
-  Result.(str |> read >|= eval repl_env >>= map_err Option.some >|= print)
+  read str
+  |> Seq.map (function
+    | Ok ast -> Result.(eval repl_env ast >|= print)
+    | Error _ as err -> err)
 
 let () =
   try
     while true do
       printf "user> %!";
-      let line = read_line () in
-      match rep line with
-      | Ok x -> printf "%s\n%!" x
-      | Error None -> ()
-      | Error (Some x) -> printf "Error: %s\n%!" x
+      read_line ()
+      |> rep
+      |> Seq.iter (function
+        | Ok x -> printf "%s\n%!" x
+        | Error x -> printf "Error: %s\n%!" (T.to_string false x))
     done
   with End_of_file -> print_newline ()
