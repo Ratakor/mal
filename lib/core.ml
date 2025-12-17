@@ -275,6 +275,18 @@ let slurp self = function
   | [ _ ] -> invalid_arg self
   | xs -> invalid_num_args self xs
 
+let readline self = function
+  | [ T.String prompt ] -> (
+      try
+        Printf.printf "%s%!" prompt;
+        Ok (T.String (read_line ()))
+      with e -> (
+        match e with
+        | End_of_file -> Ok Nil
+        | e -> Types.errstr (self ^ ": " ^ Printexc.to_string e)))
+  | [ _ ] -> invalid_arg self
+  | xs -> invalid_num_args self xs
+
 let init env =
   let set s f = Env.set s (Types.fn (f ("Core." ^ s))) env in
 
@@ -336,6 +348,6 @@ let init env =
   set "str" str;
   set "prn" prn;
   set "println" println;
-
   set "read-string" read_string;
-  set "slurp" slurp
+  set "slurp" slurp;
+  set "readline" readline
