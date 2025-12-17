@@ -115,7 +115,7 @@
           # requires to be in the default dev shell
           repl = {
             type = "app";
-            program = "${pkgs.writeShellScript "repl" "rlwrap dune exec stepA_mal"}";
+            program = "${pkgs.writeShellScript "repl" "rlwrap dune exec stepB_ext"}";
           };
         };
       }

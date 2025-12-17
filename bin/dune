@@ -10,7 +10,8 @@
   step7_quote
   step8_macros
   step9_try
-  stepA_mal)
+  stepA_mal
+  stepB_ext)
  (libraries mal containers)
  (flags
   (:standard -open Containers)))
