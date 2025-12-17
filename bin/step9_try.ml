@@ -21,7 +21,7 @@ let rec eval env ast =
   let open Result in
   (match Env.get "DEBUG-EVAL" env with
   | None | Some T.Nil | Some (T.Bool false) -> ()
-  | _ -> printf "EVAL: %s\n%!" (Printer.pr_str true ast));
+  | _ -> printf "EVAL: %s\n%!" (Types.to_string true ast));
 
   match ast with
   | T.Symbol x -> (
@@ -108,7 +108,8 @@ let rec eval env ast =
       | T.Fn { value = f; is_macro = true } -> f xs >>= eval env
       | T.Fn { value = f; _ } -> Types.Traverse.map_m (eval env) xs >>= f
       | _ ->
-          Types.errstr (sprintf "'%s' is not callable" (Printer.pr_str true x)))
+          Types.errstr (sprintf "'%s' is not callable" (Types.to_string true x))
+      )
   | T.Vector xs -> Types.Traverse.map_m (eval env) xs >|= Types.vector
   | T.Map xs ->
       Types.MalMap.fold
@@ -122,7 +123,7 @@ let rec eval env ast =
   | x -> Ok x
 
 let read str = Reader.read_str str
-let print exp = Printer.pr_str true exp
+let print exp = Types.to_string true exp
 let re str = Result.(str |> read >>= eval Core.ns)
 let rep str = Result.(str |> re >|= print)
 
@@ -158,7 +159,7 @@ let () =
   if Array.length Sys.argv > 1 then
     match re (sprintf {|(load-file "%s")|} Sys.argv.(1)) with
     | Ok _ | Error T.Nil -> ()
-    | Error x -> printf "Error: %s\n%!" (Printer.pr_str false x)
+    | Error x -> printf "Error: %s\n%!" (Types.to_string false x)
   else
     try
       while true do
@@ -167,6 +168,6 @@ let () =
         match rep line with
         | Ok x -> printf "%s\n%!" x
         | Error T.Nil -> ()
-        | Error x -> printf "Error: %s\n%!" (Printer.pr_str false x)
+        | Error x -> printf "Error: %s\n%!" (Types.to_string false x)
       done
     with End_of_file -> print_newline ()

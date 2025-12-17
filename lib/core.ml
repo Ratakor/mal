@@ -245,7 +245,7 @@ let throw self = function
   | xs -> invalid_num_args self xs
 
 let pr_str_list sep readably xs =
-  String.concat sep (List.map (Printer.pr_str readably) xs)
+  String.concat sep (List.map (Types.to_string readably) xs)
 
 let pr_str _ xs = Ok (T.String (pr_str_list " " true xs))
 let str _ xs = Ok (T.String (pr_str_list "" false xs))
@@ -264,7 +264,7 @@ let read_string self = function
       |> function
       | Ok _ as ok -> ok
       | Error T.Nil -> Ok T.Nil
-      | Error x -> Types.errstr (self ^ ": " ^ Printer.pr_str false x))
+      | Error x -> Types.errstr (self ^ ": " ^ Types.to_string false x))
   | [ _ ] -> invalid_arg self
   | xs -> invalid_num_args self xs
 
