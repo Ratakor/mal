@@ -48,7 +48,7 @@ let rec eval env ast =
       let* () = bind_pairs binds in
       eval sub_env body
   | T.List (T.Symbol "do" :: body, _) ->
-      T.Traverse.fold_m (fun _acc x -> eval env x) T.nil body
+      T.LT.fold_m (fun _acc x -> eval env x) T.nil body
   | T.List ([ T.Symbol "if"; cond; then_expr; else_expr ], _) -> (
       eval env cond
       >>= function
@@ -107,9 +107,9 @@ let rec eval env ast =
       eval env x
       >>= function
       | T.Fn ((f, _) as fn) when T.is_macro fn -> f xs >>= eval env
-      | T.Fn (f, _) -> T.Traverse.map_m (eval env) xs >>= f
+      | T.Fn (f, _) -> T.LT.map_m (eval env) xs >>= f
       | _ -> T.errstr (sprintf "'%s' is not callable" (T.to_string true x)))
-  | T.Vector (xs, _) -> T.Traverse.map_m (eval env) xs >|= T.vector
+  | T.Vector (xs, _) -> T.LT.map_m (eval env) xs >|= T.vector
   | T.Map (xs, _) ->
       T.MalMap.fold
         (fun k v acc ->
@@ -123,8 +123,37 @@ let rec eval env ast =
 
 let read str = Reader.read_str str
 let print exp = T.to_string true exp
-let re str = Result.(str |> read >>= eval Core.ns)
-let rep str = Result.(str |> re >|= print)
+
+(* eval all forms (lazy) *)
+let rep str =
+  read str
+  |> Seq.map (function
+    | Ok ast -> Result.(eval Core.ns ast >|= print)
+    | Error _ as err -> err)
+
+(* return on first error (eager) *)
+let re str =
+  read str
+  |> T.ST.map_m (function
+    | Ok ast -> eval Core.ns ast
+    | Error _ as err -> err)
+  |> Result.map_err (T.to_string false)
+
+let mal_defs () =
+  let open Result in
+  let* _not = re "(def! not (fn* (a) (if a false true)))" in
+  let* _load_file =
+    re
+      "(def! load-file (fn* (f) (eval (read-string (str \"(do \" (slurp f) \"\n\
+       nil)\")))))"
+  in
+  let+ _cond =
+    re
+      "(defmacro! cond (fn* (& xs) (if (> (count xs) 0) (list 'if (first xs) \
+       (if (> (count xs) 1) (nth xs 1) (throw \"odd number of forms to \
+       cond\")) (cons 'cond (rest (rest xs)))))))"
+  in
+  ()
 
 let () =
   Core.init Core.ns;
@@ -143,32 +172,20 @@ let () =
       | xs -> Core.invalid_num_args "eval" xs))
     Core.ns;
 
-  re "(def! not (fn* (a) (if a false true)))" |> ignore;
-
-  re
-    "(def! load-file (fn* (f) (eval (read-string (str \"(do \" (slurp f) \"\n\
-     nil)\")))))"
-  |> ignore;
-
-  re
-    "(defmacro! cond (fn* (& xs) (if (> (count xs) 0) (list 'if (first xs) (if \
-     (> (count xs) 1) (nth xs 1) (throw \"odd number of forms to cond\")) \
-     (cons 'cond (rest (rest xs)))))))"
-  |> ignore;
+  mal_defs () |> Result.get_or_failwith;
 
   if Array.length Sys.argv > 1 then
-    match re (sprintf {|(load-file "%s")|} Sys.argv.(1)) with
-    | Ok _ | Error T.Nil -> ()
-    | Error x -> printf "Error: %s\n%!" (T.to_string false x)
+    re (sprintf {|(load-file "%s")|} Sys.argv.(1))
+    |> Result.iter_err (printf "Error: %s\n%!")
   else
     try
-      re "(println (str \"Mal [\" *host-language* \"]\" ))" |> ignore;
+      re {|(println (str "Mal [" *host-language* "]" ))|} |> ignore;
       while true do
         printf "user> %!";
-        let line = read_line () in
-        match rep line with
-        | Ok x -> printf "%s\n%!" x
-        | Error T.Nil -> ()
-        | Error x -> printf "Error: %s\n%!" (T.to_string false x)
+        read_line ()
+        |> rep
+        |> Seq.iter (function
+          | Ok x -> printf "%s\n%!" x
+          | Error x -> printf "Error: %s\n%!" (T.to_string false x))
       done
     with End_of_file -> print_newline ()

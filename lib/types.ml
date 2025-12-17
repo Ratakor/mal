@@ -30,12 +30,15 @@ and MalMap : (Map.S with type key = MalValue.t) = Map.Make (MalValue)
 
 include Types
 
-module Traverse = List.Traverse (struct
+module Monad = struct
   type 'a t = ('a, Types.t) result
 
   let return = Result.return
   let ( >>= ) = Result.( >>= )
-end)
+end
+
+module LT = List.Traverse (Monad)
+module ST = Seq.Traverse (Monad)
 
 let rec equal a b =
   match (a, b) with

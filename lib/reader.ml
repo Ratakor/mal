@@ -21,12 +21,11 @@ let is_int_literal s = Str.string_match number_re s 0
 let is_string_literal s = Char.(s.[0] = '"')
 let is_keyword_literal s = Char.(s.[0] = ':')
 
-let unescaped s =
-  try Ok (Scanf.sscanf s "%S%!" Fun.id)
-  with e -> T.errstr (Printexc.to_string e)
-
 let unexpected_eof expected =
   T.errstr (Printf.sprintf "Expected '%s', got EOF" expected)
+
+let unescaped s =
+  try Ok (Scanf.sscanf s "%S%!" Fun.id) with _ -> unexpected_eof "\""
 
 let rec read_form ?(expected = "") = function
   | [] -> (
@@ -83,13 +82,12 @@ and read_atom = function
       T.keyword' (String.sub x 1 (String.length x - 1))
   | x -> T.symbol' x
 
-(* TODO: This should tokenize then return a Seq that read_form *)
+(* TODO: handle multi-line expressions *)
 let read_str str =
-  str
-  |> tokenize
-  |> read_form
-  >>= fun (form, tokens) ->
-  match tokens with
-  | [] -> return form
-  | x :: _ when is_comment x -> return form
-  | _ -> T.errstr ("Remaining tokens: " ^ List.to_string Fun.id tokens)
+  let rec aux tokens () =
+    match read_form tokens with
+    | Error T.Nil -> Seq.Nil
+    | Ok (form, tokens) -> Seq.Cons (Ok form, aux tokens)
+    | Error _ as err -> Seq.Cons (err, aux [])
+  in
+  aux (tokenize str)

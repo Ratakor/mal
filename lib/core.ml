@@ -20,7 +20,7 @@ let int_cmp_binary f self = function
 let int_arith_fold f self = function
   | T.Int x :: xs ->
       let open Result in
-      T.Traverse.fold_m
+      T.LT.fold_m
         (fun acc -> function
           | T.Int a -> Ok (f acc a)
           | _ -> invalid_arg self)
@@ -32,7 +32,7 @@ let int_arith_fold f self = function
 let div self = function
   | T.Int x :: xs ->
       let open Result in
-      T.Traverse.fold_m
+      T.LT.fold_m
         (fun acc -> function
           | T.Int a -> (
               try Ok Int.(acc / a) with _ -> T.errstr "Division by zero")
@@ -155,7 +155,7 @@ let cons self = function
 
 let concat self arg =
   let open Result in
-  T.Traverse.fold_m
+  T.LT.fold_m
     (fun acc -> function
       | T.List (x, _) | T.Vector (x, _) -> Ok (acc @ x)
       | _ -> invalid_arg self)
@@ -199,7 +199,7 @@ let apply self = function
 
 let map self = function
   | [ T.Fn (f, _); T.List (xs, _) ] | [ T.Fn (f, _); T.Vector (xs, _) ] ->
-      Result.(T.Traverse.map_m Fun.(List.pure %> f) xs >|= T.list)
+      Result.(T.LT.map_m Fun.(List.pure %> f) xs >|= T.list)
   | [ _; _ ] -> invalid_arg self
   | xs -> invalid_num_args self xs
 
@@ -291,11 +291,12 @@ let println _ xs =
 
 let read_string self = function
   | [ T.String s ] -> (
-      Reader.read_str s
+      (* Read only first expr *)
+      Reader.read_str s ()
       |> function
-      | Ok _ as ok -> ok
-      | Error T.Nil -> T.nil'
-      | Error x -> T.errstr (self ^ ": " ^ T.to_string false x))
+      | Seq.Nil -> T.nil'
+      | Cons ((Ok _ as ok), _) -> ok
+      | Cons (Error x, _) -> T.errstr (self ^ ": " ^ T.to_string false x))
   | [ _ ] -> invalid_arg self
   | xs -> invalid_num_args self xs
 
