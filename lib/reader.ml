@@ -74,7 +74,8 @@ and read_atom = function
   | "nil" -> Ok T.Nil
   | "true" -> Ok (T.Bool true)
   | "false" -> Ok (T.Bool false)
-  | x when is_int_literal x -> Ok (T.Int (int_of_string x))
+  | x when is_int_literal x -> (
+      try Ok (T.Int (int_of_string x)) with _ -> Types.errstr "Number too big")
   | x when is_string_literal x -> Result.(unescaped x >|= Types.string)
   | x when is_keyword_literal x ->
       Ok (T.Keyword (String.sub x 1 (String.length x - 1)))
