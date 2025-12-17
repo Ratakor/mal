@@ -1,6 +1,6 @@
 (library
  (name mal)
- (libraries containers str)
+ (libraries containers str unix)
  (wrapped false)
  (flags
   (:standard -open Containers)))

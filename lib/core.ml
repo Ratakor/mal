@@ -116,6 +116,26 @@ let is_sequential self = function
   | [ _ ] -> Ok (T.Bool false)
   | xs -> invalid_num_args self xs
 
+let is_string self = function
+  | [ T.String _ ] -> Ok (T.Bool true)
+  | [ _ ] -> Ok (T.Bool false)
+  | xs -> invalid_num_args self xs
+
+let is_number self = function
+  | [ T.Int _ ] -> Ok (T.Bool true)
+  | [ _ ] -> Ok (T.Bool false)
+  | xs -> invalid_num_args self xs
+
+let is_fn self = function
+  | [ T.Fn _ ] -> Ok (T.Bool true)
+  | [ _ ] -> Ok (T.Bool false)
+  | xs -> invalid_num_args self xs
+
+let is_macro self = function
+  | [ T.Fn { is_macro = true; _ } ] -> Ok (T.Bool true)
+  | [ _ ] -> Ok (T.Bool false)
+  | xs -> invalid_num_args self xs
+
 let is_empty self = function
   | [ T.List [] ] | [ T.Vector [] ] -> Ok (T.Bool true)
   | [ T.List _ ] | [ T.Vector _ ] -> Ok (T.Bool false)
@@ -287,6 +307,10 @@ let readline self = function
   | [ _ ] -> invalid_arg self
   | xs -> invalid_num_args self xs
 
+let time_ms self = function
+  | [] -> Ok (T.Int (int_of_float (1000.0 *. Unix.gettimeofday ())))
+  | xs -> invalid_num_args self xs
+
 let init env =
   let set s f = Env.set s (Types.fn (f ("Core." ^ s))) env in
 
@@ -320,6 +344,10 @@ let init env =
   set "vector?" is_vector;
   set "map?" is_map;
   set "sequential?" is_sequential;
+  set "string?" is_string;
+  set "number?" is_number;
+  set "fn?" is_fn;
+  set "macro?" is_macro;
 
   set "empty?" is_empty;
   set "count" count;
@@ -330,6 +358,8 @@ let init env =
   set "rest" rest;
   set "apply" apply;
   set "map" map;
+  (* set "conj" conj; *)
+  (* set "seq" seq; *)
 
   set "assoc" assoc;
   set "dissoc" dissoc;
@@ -350,4 +380,6 @@ let init env =
   set "println" println;
   set "read-string" read_string;
   set "slurp" slurp;
-  set "readline" readline
+  set "readline" readline;
+
+  set "time-ms" time_ms
