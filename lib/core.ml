@@ -1,259 +1,252 @@
-module T = Types.Types
+module T = Types
 
 let ns = Env.make None
 
 let invalid_num_args fn args =
   Printf.sprintf "Wrong number of args (%d) passed to: %s" (List.length args) fn
-  |> Types.errstr
+  |> T.errstr
 
-let invalid_arg fn = Types.errstr ("Invalid argument passed to: " ^ fn)
+let invalid_arg fn = T.errstr ("Invalid argument passed to: " ^ fn)
 
 let equal self = function
-  | [ a; b ] -> Ok (T.Bool (Types.equal a b))
+  | [ a; b ] -> T.bool' (T.equal a b)
   | xs -> invalid_num_args self xs
 
 let int_cmp_binary f self = function
-  | [ T.Int a; T.Int b ] -> Ok (T.Bool (f a b))
+  | [ T.Int a; T.Int b ] -> T.bool' (f a b)
   | [ _; _ ] -> invalid_arg self
   | xs -> invalid_num_args self xs
 
 let int_arith_fold f self = function
   | T.Int x :: xs ->
       let open Result in
-      Types.Traverse.fold_m
+      T.Traverse.fold_m
         (fun acc -> function
           | T.Int a -> Ok (f acc a)
           | _ -> invalid_arg self)
         x xs
-      >|= Types.int
+      >|= T.int
   | [] -> invalid_num_args self []
   | _ -> invalid_arg self
 
 let div self = function
   | T.Int x :: xs ->
       let open Result in
-      Types.Traverse.fold_m
+      T.Traverse.fold_m
         (fun acc -> function
           | T.Int a -> (
-              try Ok Int.(acc / a) with _ -> Types.errstr "Division by zero")
+              try Ok Int.(acc / a) with _ -> T.errstr "Division by zero")
           | _ -> invalid_arg self)
         x xs
-      >|= Types.int
+      >|= T.int
   | [] -> invalid_num_args self []
   | _ -> invalid_arg self
 
-let list _ = Fun.(Types.list %> Result.return)
-let vector _ = Fun.(Types.vector %> Result.return)
+let list _ arg = T.list' arg
+let vector _ arg = T.vector' arg
 
 let atom self = function
-  | [ x ] -> Ok (Types.atom x)
+  | [ x ] -> T.atom' x
   | xs -> invalid_num_args self xs
 
 let vec self = function
-  | [ T.List xs ] | [ T.Vector xs ] -> Ok (T.Vector xs)
+  | [ T.List (xs, _) ] | [ T.Vector (xs, _) ] -> T.vector' xs
   | [ _ ] -> invalid_arg self
   | xs -> invalid_num_args self xs
 
 let symbol self = function
-  | [ T.String x ] -> Ok (T.Symbol x)
+  | [ T.String x ] -> T.symbol' x
   | [ _ ] -> invalid_arg self
   | xs -> invalid_num_args self xs
 
 let keyword self = function
-  | [ T.String x ] | [ T.Keyword x ] -> Ok (T.Keyword x)
+  | [ T.String x ] | [ T.Keyword x ] -> T.keyword' x
   | [ _ ] -> invalid_arg self
   | xs -> invalid_num_args self xs
 
-let hash_map _ = Types.map_of_list Types.MalMap.empty
+let hash_map _ = T.map_of_list T.MalMap.empty
 
 let is_list self = function
-  | [ T.List _ ] -> Ok (T.Bool true)
-  | [ _ ] -> Ok (T.Bool false)
+  | [ T.List _ ] -> T.maltrue'
+  | [ _ ] -> T.malfalse'
   | xs -> invalid_num_args self xs
 
 let is_atom self = function
-  | [ T.Atom _ ] -> Ok (T.Bool true)
-  | [ _ ] -> Ok (T.Bool false)
+  | [ T.Atom _ ] -> T.maltrue'
+  | [ _ ] -> T.malfalse'
   | xs -> invalid_num_args self xs
 
 let is_nil self = function
-  | [ T.Nil ] -> Ok (T.Bool true)
-  | [ _ ] -> Ok (T.Bool false)
+  | [ T.Nil ] -> T.maltrue'
+  | [ _ ] -> T.malfalse'
   | xs -> invalid_num_args self xs
 
 let is_true self = function
-  | [ T.Bool true ] -> Ok (T.Bool true)
-  | [ _ ] -> Ok (T.Bool false)
+  | [ T.Bool true ] -> T.maltrue'
+  | [ _ ] -> T.malfalse'
   | xs -> invalid_num_args self xs
 
 let is_false self = function
-  | [ T.Bool false ] -> Ok (T.Bool true)
-  | [ _ ] -> Ok (T.Bool false)
+  | [ T.Bool false ] -> T.maltrue'
+  | [ _ ] -> T.malfalse'
   | xs -> invalid_num_args self xs
 
 let is_symbol self = function
-  | [ T.Symbol _ ] -> Ok (T.Bool true)
-  | [ _ ] -> Ok (T.Bool false)
+  | [ T.Symbol _ ] -> T.maltrue'
+  | [ _ ] -> T.malfalse'
   | xs -> invalid_num_args self xs
 
 let is_keyword self = function
-  | [ T.Keyword _ ] -> Ok (T.Bool true)
-  | [ _ ] -> Ok (T.Bool false)
+  | [ T.Keyword _ ] -> T.maltrue'
+  | [ _ ] -> T.malfalse'
   | xs -> invalid_num_args self xs
 
 let is_vector self = function
-  | [ T.Vector _ ] -> Ok (T.Bool true)
-  | [ _ ] -> Ok (T.Bool false)
+  | [ T.Vector _ ] -> T.maltrue'
+  | [ _ ] -> T.malfalse'
   | xs -> invalid_num_args self xs
 
 let is_map self = function
-  | [ T.Map _ ] -> Ok (T.Bool true)
-  | [ _ ] -> Ok (T.Bool false)
+  | [ T.Map _ ] -> T.maltrue'
+  | [ _ ] -> T.malfalse'
   | xs -> invalid_num_args self xs
 
 let is_sequential self = function
-  | [ T.List _ ] | [ T.Vector _ ] -> Ok (T.Bool true)
-  | [ _ ] -> Ok (T.Bool false)
+  | [ T.List _ ] | [ T.Vector _ ] -> T.maltrue'
+  | [ _ ] -> T.malfalse'
   | xs -> invalid_num_args self xs
 
 let is_string self = function
-  | [ T.String _ ] -> Ok (T.Bool true)
-  | [ _ ] -> Ok (T.Bool false)
+  | [ T.String _ ] -> T.maltrue'
+  | [ _ ] -> T.malfalse'
   | xs -> invalid_num_args self xs
 
 let is_number self = function
-  | [ T.Int _ ] -> Ok (T.Bool true)
-  | [ _ ] -> Ok (T.Bool false)
+  | [ T.Int _ ] -> T.maltrue'
+  | [ _ ] -> T.malfalse'
   | xs -> invalid_num_args self xs
 
 let is_fn self = function
-  | [ T.Fn { is_macro = false; _ } ] -> Ok (T.Bool true)
-  | [ _ ] -> Ok (T.Bool false)
+  | [ T.Fn fn ] when not (T.is_macro fn) -> T.maltrue'
+  | [ _ ] -> T.malfalse'
   | xs -> invalid_num_args self xs
 
 let is_macro self = function
-  | [ T.Fn { is_macro = true; _ } ] -> Ok (T.Bool true)
-  | [ _ ] -> Ok (T.Bool false)
+  | [ T.Fn fn ] when T.is_macro fn -> T.maltrue'
+  | [ _ ] -> T.malfalse'
   | xs -> invalid_num_args self xs
 
 let is_empty self = function
-  | [ T.List [] ] | [ T.Vector [] ] -> Ok (T.Bool true)
-  | [ T.List _ ] | [ T.Vector _ ] -> Ok (T.Bool false)
+  | [ T.List ([], _) ] | [ T.Vector ([], _) ] -> T.maltrue'
+  | [ T.List _ ] | [ T.Vector _ ] -> T.malfalse'
   | [ _ ] -> invalid_arg self
   | xs -> invalid_num_args self xs
 
 let count self = function
-  | [ T.List xs ] | [ T.Vector xs ] -> Ok (T.Int (List.length xs))
-  | [ T.Nil ] -> Ok (T.Int 0)
+  | [ T.List (xs, _) ] | [ T.Vector (xs, _) ] -> T.int' (List.length xs)
+  | [ T.Nil ] -> T.int' 0
   | [ _ ] -> invalid_arg self
   | xs -> invalid_num_args self xs
 
 let cons self = function
-  | [ x; T.List xs ] | [ x; T.Vector xs ] -> Ok (T.List (x :: xs))
+  | [ x; T.List (xs, _) ] | [ x; T.Vector (xs, _) ] -> T.list' (x :: xs)
   | [ _ ] -> invalid_arg self
   | xs -> invalid_num_args self xs
 
 let concat self arg =
   let open Result in
-  Types.Traverse.fold_m
+  T.Traverse.fold_m
     (fun acc -> function
-      | T.List x | T.Vector x -> Ok (acc @ x)
+      | T.List (x, _) | T.Vector (x, _) -> Ok (acc @ x)
       | _ -> invalid_arg self)
     [] arg
-  >|= Types.list
+  >|= T.list
 
 let nth self = function
-  | [ T.List xs; T.Int i ] | [ T.Vector xs; T.Int i ] -> (
-      try Ok (List.nth xs i)
-      with _ -> Types.errstr (self ^ ": index out of range"))
+  | [ T.List (xs, _); T.Int i ] | [ T.Vector (xs, _); T.Int i ] -> (
+      try Ok (List.nth xs i) with _ -> T.errstr (self ^ ": index out of range"))
   | [ _; _ ] -> invalid_arg self
   | xs -> invalid_num_args self xs
 
 let first self = function
-  | [ T.List xs ] | [ T.Vector xs ] -> (
+  | [ T.List (xs, _) ] | [ T.Vector (xs, _) ] -> (
       match xs with
-      | [] -> Ok T.Nil
+      | [] -> T.nil'
       | x :: _ -> Ok x)
-  | [ T.Nil ] -> Ok T.Nil
+  | [ T.Nil ] -> T.nil'
   | [ _ ] -> invalid_arg self
   | xs -> invalid_num_args self xs
 
 let rest self = function
-  | [ T.List xs ] | [ T.Vector xs ] -> (
+  | [ T.List (xs, _) ] | [ T.Vector (xs, _) ] -> (
       match xs with
-      | [] -> Ok (T.List [])
-      | _ :: xs -> Ok (T.List xs))
-  | [ T.Nil ] -> Ok (T.List [])
+      | [] -> T.list' []
+      | _ :: xs -> T.list' xs)
+  | [ T.Nil ] -> T.list' []
   | [ _ ] -> invalid_arg self
   | xs -> invalid_num_args self xs
 
 let apply self = function
   | ([] | T.Fn _ :: []) as xs -> invalid_num_args self xs
-  | T.Fn { value = f; _ } :: xs ->
+  | T.Fn (f, _) :: xs ->
       let[@tail_mod_cons] rec aux = function
         | [] -> []
-        | [ T.List x ] | [ T.Vector x ] -> x
+        | [ T.List (x, _) ] | [ T.Vector (x, _) ] -> x
         | x :: xs -> x :: aux xs
       in
       f (aux xs)
   | _ -> invalid_arg self
 
 let map self = function
-  | [ T.Fn { value = f; _ }; T.List xs ]
-  | [ T.Fn { value = f; _ }; T.Vector xs ] ->
-      Result.(Types.Traverse.map_m Fun.(List.pure %> f) xs >|= Types.list)
+  | [ T.Fn (f, _); T.List (xs, _) ] | [ T.Fn (f, _); T.Vector (xs, _) ] ->
+      Result.(T.Traverse.map_m Fun.(List.pure %> f) xs >|= T.list)
   | [ _; _ ] -> invalid_arg self
   | xs -> invalid_num_args self xs
 
 let conj self = function
   | ([] | T.List _ :: [] | T.Vector _ :: []) as xs -> invalid_num_args self xs
-  | T.List x :: xs -> Ok (T.List (List.fold_left List.cons' x xs))
-  | T.Vector x :: xs -> Ok (T.Vector (x @ xs))
+  | T.List (x, meta) :: xs -> T.list' (List.fold_left List.cons' x xs) ~meta
+  | T.Vector (x, meta) :: xs -> T.vector' (x @ xs) ~meta
   | _ :: _ -> invalid_arg self
 
 let seq self = function
-  | [ T.List [] ] | [ T.Vector [] ] | [ T.String "" ] | [ T.Nil ] -> Ok T.Nil
-  | [ T.List x ] | [ T.Vector x ] -> Ok (T.List x)
+  | [ T.List ([], _) ] | [ T.Vector ([], _) ] | [ T.String "" ] | [ T.Nil ] ->
+      T.nil'
+  | [ T.List (x, _) ] | [ T.Vector (x, _) ] -> T.list' x
   | [ T.String x ] ->
-      String.to_list x
-      |> List.map Fun.(String.make 1 %> Types.string)
-      |> Types.list
-      |> Result.return
+      String.to_list x |> List.map Fun.(String.make 1 %> T.string) |> T.list'
   | [ _ ] -> invalid_arg self
   | xs -> invalid_num_args self xs
 
 let assoc self = function
-  | T.Map m :: xs -> Types.map_of_list m xs
+  | T.Map (m, meta) :: xs -> T.map_of_list m xs ~meta
   | _ :: _ -> invalid_arg self
   | [] -> invalid_num_args self []
 
 let dissoc self = function
-  | T.Map m :: xs ->
-      Ok (T.Map (List.fold_left (Fun.flip Types.MalMap.remove) m xs))
+  | T.Map (m, meta) :: xs ->
+      T.map' (List.fold_left (Fun.flip T.MalMap.remove) m xs) ~meta
   | _ :: _ -> invalid_arg self
   | [] -> invalid_num_args self []
 
 let get self = function
-  | [ T.Map m; k ] -> Ok (Types.MalMap.get_or k m ~default:Nil)
-  | [ T.Nil; _ ] -> Ok T.Nil
+  | [ T.Map (m, _); k ] -> Ok (T.MalMap.get_or k m ~default:T.nil)
+  | [ T.Nil; _ ] -> T.nil'
   | [ _; _ ] -> invalid_arg self
   | xs -> invalid_num_args self xs
 
 let contains self = function
-  | [ T.Map m; k ] ->
-      Ok (Types.MalMap.find_opt k m |> Option.is_some |> Types.bool)
+  | [ T.Map (m, _); k ] -> T.MalMap.get k m |> Option.is_some |> T.bool'
   | [ _; _ ] -> invalid_arg self
   | xs -> invalid_num_args self xs
 
 let keys self = function
-  | [ T.Map m ] ->
-      Ok (T.List (Types.MalMap.fold (fun k _ acc -> k :: acc) m []))
+  | [ T.Map (m, _) ] -> T.MalMap.fold (fun k _ acc -> k :: acc) m [] |> T.list'
   | [ _ ] -> invalid_arg self
   | _ -> invalid_num_args self []
 
 let vals self = function
-  | [ T.Map m ] ->
-      Ok (T.List (Types.MalMap.fold (fun _ v acc -> v :: acc) m []))
+  | [ T.Map (m, _) ] -> T.MalMap.fold (fun _ v acc -> v :: acc) m [] |> T.list'
   | [ _ ] -> invalid_arg self
   | _ -> invalid_num_args self []
 
@@ -270,7 +263,7 @@ let reset self = function
   | xs -> invalid_num_args self xs
 
 let swap self = function
-  | T.Atom x :: T.Fn { value = f; _ } :: args ->
+  | T.Atom x :: T.Fn (f, _) :: args ->
       let open Result in
       let* v = f (!x :: args) in
       x := v;
@@ -283,33 +276,33 @@ let throw self = function
   | xs -> invalid_num_args self xs
 
 let pr_str_list sep readably xs =
-  String.concat sep (List.map (Types.to_string readably) xs)
+  String.concat sep (List.map (T.to_string readably) xs)
 
-let pr_str _ xs = Ok (T.String (pr_str_list " " true xs))
-let str _ xs = Ok (T.String (pr_str_list "" false xs))
+let pr_str _ xs = T.string' (pr_str_list " " true xs)
+let str _ xs = T.string' (pr_str_list "" false xs)
 
 let prn _ xs =
   print_endline (pr_str_list " " true xs);
-  Ok T.Nil
+  T.nil'
 
 let println _ xs =
   print_endline (pr_str_list " " false xs);
-  Ok T.Nil
+  T.nil'
 
 let read_string self = function
   | [ T.String s ] -> (
       Reader.read_str s
       |> function
       | Ok _ as ok -> ok
-      | Error T.Nil -> Ok T.Nil
-      | Error x -> Types.errstr (self ^ ": " ^ Types.to_string false x))
+      | Error T.Nil -> T.nil'
+      | Error x -> T.errstr (self ^ ": " ^ T.to_string false x))
   | [ _ ] -> invalid_arg self
   | xs -> invalid_num_args self xs
 
 let slurp self = function
   | [ T.String filename ] -> (
-      try Ok (T.String IO.(with_in filename read_all))
-      with e -> Types.errstr (self ^ ": " ^ Printexc.to_string e))
+      try T.string' IO.(with_in filename read_all)
+      with e -> T.errstr (self ^ ": " ^ Printexc.to_string e))
   | [ _ ] -> invalid_arg self
   | xs -> invalid_num_args self xs
 
@@ -317,26 +310,37 @@ let readline self = function
   | [ T.String prompt ] -> (
       try
         Printf.printf "%s%!" prompt;
-        Ok (T.String (read_line ()))
+        T.string' (read_line ())
       with e -> (
         match e with
-        | End_of_file -> Ok Nil
-        | e -> Types.errstr (self ^ ": " ^ Printexc.to_string e)))
+        | End_of_file -> T.nil'
+        | e -> T.errstr (self ^ ": " ^ Printexc.to_string e)))
   | [ _ ] -> invalid_arg self
   | xs -> invalid_num_args self xs
 
 let time_ms self = function
-  | [] -> Ok (T.Int (int_of_float (1000.0 *. Unix.gettimeofday ())))
+  | [] -> T.int' (int_of_float (1000.0 *. Unix.gettimeofday ()))
   | xs -> invalid_num_args self xs
 
 let meta self = function
-  | _ -> Types.errstr (self ^ ": Not Implemented")
+  | [ T.List (_, meta) ]
+  | [ T.Vector (_, meta) ]
+  | [ T.Map (_, meta) ]
+  | [ T.Fn (_, meta) ] -> Ok meta
+  | [ _ ] -> T.nil'
+  | xs -> invalid_num_args self xs
 
 let with_meta self = function
-  | _ -> Types.errstr (self ^ ": Not Implemented")
+  | [ T.List (x, _); meta ] -> T.list' x ~meta
+  | [ T.Vector (x, _); meta ] -> T.vector' x ~meta
+  | [ T.Map (x, _); meta ] -> T.map' x ~meta
+  | [ T.Fn ((x, _) as fn); meta ] when T.is_macro fn -> T.macro (x, meta)
+  | [ T.Fn (x, _); meta ] -> T.fn' x ~meta
+  | [ _; _ ] -> invalid_arg self
+  | xs -> invalid_num_args self xs
 
 let init env =
-  let set s f = Env.set s (Types.fn (f ("Core." ^ s))) env in
+  let set s f = Env.set s (T.fn (f ("Core." ^ s))) env in
 
   set "=" equal;
 

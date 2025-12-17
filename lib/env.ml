@@ -1,9 +1,8 @@
-module T = Types.Types
 module Data = Map.Make (String)
 
 type env = {
   outer : env option;
-  data : T.t Data.t ref;
+  data : Types.t Data.t ref; (* TODO: why is this a ref? *)
 }
 
 let make outer = { outer; data = ref Data.empty }

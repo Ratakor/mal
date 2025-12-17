@@ -1,4 +1,5 @@
-module T = Types.Types
+module T = Types
+open Result
 
 let number_re = Str.regexp {|-?[0-9]+|}
 
@@ -22,13 +23,16 @@ let is_keyword_literal s = Char.(s.[0] = ':')
 
 let unescaped s =
   try Ok (Scanf.sscanf s "%S%!" Fun.id)
-  with e -> Types.errstr (Printexc.to_string e)
+  with e -> T.errstr (Printexc.to_string e)
 
 let unexpected_eof expected =
-  Types.errstr (Printf.sprintf "Expected '%s', got EOF" expected)
+  T.errstr (Printf.sprintf "Expected '%s', got EOF" expected)
 
-let rec read_form = function
-  | [] -> Error T.Nil
+let rec read_form ?(expected = "") = function
+  | [] -> (
+      match expected with
+      | "" -> Error T.Nil (* this is used for empty line *)
+      | x -> unexpected_eof x)
   | x :: tokens when is_comment x -> read_form tokens
   | "(" :: tokens -> read_list tokens
   | "[" :: tokens -> read_vector tokens
@@ -38,51 +42,49 @@ let rec read_form = function
   | "`" :: tokens -> read_quote "quasiquote" tokens
   | "~" :: tokens -> read_quote "unquote" tokens
   | "~@" :: tokens -> read_quote "splice-unquote" tokens
-  | x :: tokens -> Result.(read_atom x >|= fun x -> (x, tokens))
+  | "^" :: tokens -> read_with_meta tokens
+  | x :: tokens -> read_atom x >|= fun x -> (x, tokens)
 
 and read_collection closing =
   let rec aux acc = function
     | [] -> unexpected_eof closing
     | x :: tokens when String.(x = closing) -> Ok (List.rev acc, tokens)
-    | tokens -> (
-        match read_form tokens with
-        | Error T.Nil -> unexpected_eof closing
-        | Error _ as err -> err
-        | Ok (form, tokens) -> aux (form :: acc) tokens)
+    | tokens ->
+        let* form, tokens = read_form tokens ~expected:closing in
+        aux (form :: acc) tokens
   in
   aux []
 
-and read_list tokens =
-  Result.(read_collection ")" tokens >|= Pair.map_fst Types.list)
-
-and read_vector tokens =
-  Result.(read_collection "]" tokens >|= Pair.map_fst Types.vector)
+and read_list tokens = read_collection ")" tokens >|= Pair.map_fst T.list
+and read_vector tokens = read_collection "]" tokens >|= Pair.map_fst T.vector
 
 and read_map tokens =
-  let open Result in
   let* list, tokens = read_collection "}" tokens in
-  let+ map = Types.map_of_list Types.MalMap.empty list in
+  let+ map = T.map_of_list T.MalMap.empty list in
   (map, tokens)
 
 and read_quote symbol tokens =
-  match read_form tokens with
-  | Error T.Nil -> unexpected_eof "expr"
-  | Error _ as err -> err
-  | Ok (form, tokens) -> Ok (T.List [ T.Symbol symbol; form ], tokens)
+  let+ form, tokens = read_form tokens ~expected:"expr" in
+  (T.list [ T.symbol symbol; form ], tokens)
+
+and read_with_meta tokens =
+  let* meta, tokens = read_form tokens ~expected:"meta" in
+  let+ value, tokens = read_form tokens ~expected:"expr" in
+  (T.list [ T.symbol "with-meta"; value; meta ], tokens)
 
 and read_atom = function
-  | "nil" -> Ok T.Nil
-  | "true" -> Ok (T.Bool true)
-  | "false" -> Ok (T.Bool false)
+  | "nil" -> T.nil'
+  | "true" -> T.maltrue'
+  | "false" -> T.malfalse'
   | x when is_int_literal x -> (
-      try Ok (T.Int (int_of_string x)) with _ -> Types.errstr "Number too big")
-  | x when is_string_literal x -> Result.(unescaped x >|= Types.string)
+      try T.int' (int_of_string x) with _ -> T.errstr "Number too big")
+  | x when is_string_literal x -> unescaped x >|= T.string
   | x when is_keyword_literal x ->
-      Ok (T.Keyword (String.sub x 1 (String.length x - 1)))
-  | x -> Ok (T.Symbol x)
+      T.keyword' (String.sub x 1 (String.length x - 1))
+  | x -> T.symbol' x
 
+(* TODO: This should tokenize then return a Seq that read_form *)
 let read_str str =
-  let open Result in
   str
   |> tokenize
   |> read_form
@@ -90,4 +92,4 @@ let read_str str =
   match tokens with
   | [] -> return form
   | x :: _ when is_comment x -> return form
-  | _ -> Types.errstr ("Remaining tokens: " ^ List.to_string Fun.id tokens)
+  | _ -> T.errstr ("Remaining tokens: " ^ List.to_string Fun.id tokens)
