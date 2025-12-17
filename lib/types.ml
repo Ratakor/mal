@@ -48,13 +48,10 @@ let fn x = Types.Fn { value = x; is_macro = false }
 let atom x = Types.Atom (ref x)
 let errstr x = Error (Types.String x)
 
-let map_of_list x =
-  let rec aux acc = function
-    | [] -> Ok (Types.Map acc)
-    | k :: v :: xs -> aux (MalMap.add k v acc) xs
-    | _ :: [] -> errstr "Missing value in HashMap"
-  in
-  aux MalMap.empty x
+let rec map_of_list acc = function
+  | [] -> Ok (Types.Map acc)
+  | k :: v :: xs -> map_of_list (MalMap.add k v acc) xs
+  | _ :: [] -> errstr (Printf.sprintf "Missing value in HashMap")
 
 let rec equal a b =
   match (a, b) with

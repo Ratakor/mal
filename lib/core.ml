@@ -64,8 +64,7 @@ let keyword self = function
   | [ _ ] -> invalid_arg self
   | xs -> invalid_num_args self xs
 
-(* error message won't be great but atm idc *)
-let hash_map _ = Types.map_of_list
+let hash_map _ = Types.map_of_list Types.MalMap.empty
 
 let is_list self = function
   | [ T.List _ ] -> Ok (T.Bool true)
@@ -186,6 +185,40 @@ let map self = function
   | [ _; _ ] -> invalid_arg self
   | xs -> invalid_num_args self xs
 
+let assoc self = function
+  | T.Map m :: xs -> Types.map_of_list m xs
+  | _ :: _ -> invalid_arg self
+  | [] -> invalid_num_args self []
+
+let dissoc self = function
+  | T.Map m :: xs ->
+      Ok (T.Map (List.fold_left (Fun.flip Types.MalMap.remove) m xs))
+  | _ :: _ -> invalid_arg self
+  | [] -> invalid_num_args self []
+
+let get self = function
+  | [ T.Map m; k ] -> Ok (Types.MalMap.get_or k m ~default:Nil)
+  | [ _; _ ] -> invalid_arg self
+  | xs -> invalid_num_args self xs
+
+let contains self = function
+  | [ T.Map m; k ] ->
+      Ok (Types.MalMap.find_opt k m |> Option.is_some |> Types.bool)
+  | [ _; _ ] -> invalid_arg self
+  | xs -> invalid_num_args self xs
+
+let keys self = function
+  | [ T.Map m ] ->
+      Ok (T.List (Types.MalMap.fold (fun k _ acc -> k :: acc) m []))
+  | [ _ ] -> invalid_arg self
+  | _ -> invalid_num_args self []
+
+let vals self = function
+  | [ T.Map m ] ->
+      Ok (T.List (Types.MalMap.fold (fun _ v acc -> v :: acc) m []))
+  | [ _ ] -> invalid_arg self
+  | _ -> invalid_num_args self []
+
 let deref self = function
   | [ T.Atom x ] -> Ok !x
   | [ _ ] -> invalid_arg self
@@ -275,8 +308,8 @@ let init env =
   set "vector?" is_vector;
   set "map?" is_map;
   set "sequential?" is_sequential;
-  set "empty?" is_empty;
 
+  set "empty?" is_empty;
   set "count" count;
   set "cons" cons;
   set "concat" concat;
@@ -285,6 +318,13 @@ let init env =
   set "rest" rest;
   set "apply" apply;
   set "map" map;
+
+  set "assoc" assoc;
+  set "dissoc" dissoc;
+  set "get" get;
+  set "contains?" contains;
+  set "keys" keys;
+  set "vals" vals;
 
   set "deref" deref;
   set "reset!" reset;

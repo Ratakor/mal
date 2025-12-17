@@ -61,7 +61,7 @@ and read_vector tokens =
 and read_map tokens =
   let open Result in
   let* list, tokens = read_collection "}" tokens in
-  let+ map = Types.map_of_list list in
+  let+ map = Types.map_of_list Types.MalMap.empty list in
   (map, tokens)
 
 and read_quote symbol tokens =
