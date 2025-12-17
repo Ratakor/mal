@@ -127,7 +127,7 @@ let is_number self = function
   | xs -> invalid_num_args self xs
 
 let is_fn self = function
-  | [ T.Fn _ ] -> Ok (T.Bool true)
+  | [ T.Fn { is_macro = false; _ } ] -> Ok (T.Bool true)
   | [ _ ] -> Ok (T.Bool false)
   | xs -> invalid_num_args self xs
 
@@ -235,7 +235,7 @@ let dissoc self = function
 
 let get self = function
   | [ T.Map m; k ] -> Ok (Types.MalMap.get_or k m ~default:Nil)
-  | [ T.Nil; _ ] -> Ok (T.Nil)
+  | [ T.Nil; _ ] -> Ok T.Nil
   | [ _; _ ] -> invalid_arg self
   | xs -> invalid_num_args self xs
 
@@ -329,6 +329,12 @@ let time_ms self = function
   | [] -> Ok (T.Int (int_of_float (1000.0 *. Unix.gettimeofday ())))
   | xs -> invalid_num_args self xs
 
+let meta self = function
+  | _ -> Types.errstr (self ^ ": Not Implemented")
+
+let with_meta self = function
+  | _ -> Types.errstr (self ^ ": Not Implemented")
+
 let init env =
   let set s f = Env.set s (Types.fn (f ("Core." ^ s))) env in
 
@@ -400,4 +406,7 @@ let init env =
   set "slurp" slurp;
   set "readline" readline;
 
-  set "time-ms" time_ms
+  set "time-ms" time_ms;
+
+  set "meta" meta;
+  set "with-meta" with_meta
