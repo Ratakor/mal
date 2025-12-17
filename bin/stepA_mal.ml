@@ -130,6 +130,8 @@ let rep str = Result.(str |> re >|= print)
 let () =
   Core.init Core.ns;
 
+  Env.set "*host-language*" (T.String "OCaml") Core.ns;
+
   Env.set "*ARGV*"
     (T.List
        (if Array.length Sys.argv > 1 then
@@ -162,6 +164,7 @@ let () =
     | Error x -> printf "Error: %s\n%!" (Types.to_string false x)
   else
     try
+      re "(println (str \"Mal [\" *host-language* \"]\" ))" |> ignore;
       while true do
         printf "user> %!";
         let line = read_line () in
