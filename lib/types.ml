@@ -4,13 +4,16 @@ module rec Types : sig
   and t =
     | Nil
     | Bool of bool
+    | Char of char
     | Int of int
+    | Float of float
     | String of string
     | Symbol of string
     | Keyword of string
     | List of t list with_meta
     | Vector of t list with_meta
     | Map of t MalMap.t with_meta
+    | Seq of t Seq.t
     | Fn of (t list -> (t, t) result) with_meta
     | Atom of t ref
 end =
@@ -44,7 +47,9 @@ let rec equal a b =
   match (a, b) with
   | Nil, Nil -> true
   | Bool a, Bool b -> Bool.equal a b
+  | Char a, Char b -> Char.equal a b
   | Int a, Int b -> Int.equal a b
+  | Float a, Float b -> Float.equal a b
   | String a, String b | Symbol a, Symbol b | Keyword a, Keyword b ->
       String.equal a b
   | List (a, _), List (b, _)
@@ -52,6 +57,11 @@ let rec equal a b =
   | Vector (a, _), List (b, _)
   | Vector (a, _), Vector (b, _) -> List.equal equal a b
   | Map (a, _), Map (b, _) -> MalMap.equal equal a b
+  | List (a, _), Seq b | Vector (a, _), Seq b ->
+      Seq.equal equal (List.to_seq a) b
+  | Seq a, List (b, _) | Seq a, Vector (b, _) ->
+      Seq.equal equal a (List.to_seq b)
+  | Seq a, Seq b -> Seq.equal equal a b
   | Fn a, Fn b -> Stdlib.(a == b) (* meta matters for functions *)
   | Atom a, Atom b -> equal !a !b
   | _ -> false
@@ -60,8 +70,10 @@ let to_string readably =
   let rec aux = function
     | Nil -> "nil"
     | Bool x -> string_of_bool x
+    | Char x -> Printf.sprintf "%C" x
     | Int x -> string_of_int x
-    | String x when readably -> "\"" ^ String.escaped x ^ "\""
+    | Float x -> string_of_float x
+    | String x when readably -> Printf.sprintf "%S" x
     | String x | Symbol x -> x
     | Keyword x -> ":" ^ x
     | List (x, _) -> List.to_string ~start:"(" ~stop:")" ~sep:" " aux x
@@ -70,6 +82,7 @@ let to_string readably =
         MalMap.to_list x
         |> List.to_string ~start:"{" ~stop:"}" ~sep:" " (fun (k, v) ->
             Printf.sprintf "%s %s" (aux k) (aux v))
+    | Seq x -> Seq.to_list x |> List.to_string ~start:"(" ~stop:")" ~sep:" " aux
     | Fn _ -> "#<function>"
     | Atom x -> Printf.sprintf "(atom %s)" (aux !x)
   in
@@ -80,13 +93,16 @@ let nil = Nil
 let maltrue = Bool true
 let malfalse = Bool false
 let bool x = Bool x
+let char x = Char x
 let int x = Int x
+let float x = Float x
 let string x = String x
 let symbol x = Symbol x
 let keyword x = Keyword x
 let list ?(meta = nil) x = List (x, meta)
 let vector ?(meta = nil) x = Vector (x, meta)
 let map ?(meta = nil) x = Map (x, meta)
+let seq x = Seq x
 let fn ?(meta = nil) x = Fn (x, meta)
 let atom x = Atom (ref x)
 
@@ -95,7 +111,9 @@ let nil' = Ok nil
 let maltrue' = Ok maltrue
 let malfalse' = Ok malfalse
 let bool' x = Ok (bool x)
+let char' x = Ok (char x)
 let int' x = Ok (int x)
+let float' x = Ok (float x)
 let string' x = Ok (string x)
 let symbol' x = Ok (symbol x)
 let keyword' x = Ok (keyword x)
@@ -103,6 +121,7 @@ let list' ?(meta = nil) x = Ok (list x ~meta)
 let vector' ?(meta = nil) x = Ok (vector x ~meta)
 let map' ?(meta = nil) x = Ok (map x ~meta)
 let fn' ?(meta = nil) x = Ok (fn x ~meta)
+let seq' x = Ok (seq x)
 let atom' x = Ok (atom x)
 let errstr x = Error (string x)
 
