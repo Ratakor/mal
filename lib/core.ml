@@ -1,7 +1,5 @@
 module T = Types
 
-let ns = Env.make None
-
 let invalid_num_args fn args =
   Printf.sprintf "Wrong number of args (%d) passed to: %s" (List.length args) fn
   |> T.errstr
@@ -340,56 +338,49 @@ let with_meta self = function
   | [ _; _ ] -> invalid_arg self
   | xs -> invalid_num_args self xs
 
-let init env =
+let ns =
+  let env = Env.make None in
   let set s f = Env.set s (T.fn (f ("Core." ^ s))) env in
 
   set "=" equal;
+  set "throw" throw;
+
+  set "nil?" is_nil;
+  set "true?" is_true;
+  set "false?" is_false;
+  set "string?" is_string;
+  set "symbol" symbol;
+  set "symbol?" is_symbol;
+  set "keyword" keyword;
+  set "keyword?" is_keyword;
+  set "number?" is_number;
+  set "fn?" is_fn;
+  set "macro?" is_macro;
+
+  set "pr-str" pr_str;
+  set "str" str;
+  set "prn" prn;
+  set "println" println;
+  set "read-string" read_string;
+  set "readline" readline;
+  set "slurp" slurp;
 
   set "<" (int_cmp_binary Int.( < ));
   set "<=" (int_cmp_binary Int.( <= ));
   set ">" (int_cmp_binary Int.( > ));
   set ">=" (int_cmp_binary Int.( >= ));
-
   set "+" (int_arith_fold Int.( + ));
   set "-" (int_arith_fold Int.( - ));
   set "*" (int_arith_fold Int.( * ));
   set "/" div;
+  set "time-ms" time_ms;
 
   set "list" list;
-  set "vector" vector;
-  set "atom" atom;
-  set "vec" vec;
-  set "symbol" symbol;
-  set "keyword" keyword;
-  set "hash-map" hash_map;
-
   set "list?" is_list;
-  set "atom?" is_atom;
-  set "nil?" is_nil;
-  set "true?" is_true;
-  set "false?" is_false;
-  set "symbol?" is_symbol;
-  set "keyword?" is_keyword;
+  set "vector" vector;
   set "vector?" is_vector;
+  set "hash-map" hash_map;
   set "map?" is_map;
-  set "sequential?" is_sequential;
-  set "string?" is_string;
-  set "number?" is_number;
-  set "fn?" is_fn;
-  set "macro?" is_macro;
-
-  set "empty?" is_empty;
-  set "count" count;
-  set "cons" cons;
-  set "concat" concat;
-  set "nth" nth;
-  set "first" first;
-  set "rest" rest;
-  set "apply" apply;
-  set "map" map;
-  set "conj" conj;
-  set "seq" seq;
-
   set "assoc" assoc;
   set "dissoc" dissoc;
   set "get" get;
@@ -397,21 +388,27 @@ let init env =
   set "keys" keys;
   set "vals" vals;
 
+  set "sequential?" is_sequential;
+  set "cons" cons;
+  set "concat" concat;
+  set "vec" vec;
+  set "nth" nth;
+  set "first" first;
+  set "rest" rest;
+  set "empty?" is_empty;
+  set "count" count;
+  set "apply" apply;
+  set "map" map;
+
+  set "conj" conj;
+  set "seq" seq;
+
+  set "meta" meta;
+  set "with-meta" with_meta;
+  set "atom" atom;
+  set "atom?" is_atom;
   set "deref" deref;
   set "reset!" reset;
   set "swap!" swap;
 
-  set "throw" throw;
-
-  set "pr-str" pr_str;
-  set "str" str;
-  set "prn" prn;
-  set "println" println;
-  set "read-string" read_string;
-  set "slurp" slurp;
-  set "readline" readline;
-
-  set "time-ms" time_ms;
-
-  set "meta" meta;
-  set "with-meta" with_meta
+  env

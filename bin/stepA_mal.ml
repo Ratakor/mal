@@ -28,27 +28,36 @@ let rec eval env ast =
       match Env.get x env with
       | Some v -> Ok v
       | None -> T.errstr ("Unable to resolve symbol: " ^ x))
+  | T.Vector (xs, _) -> T.LT.map_m (eval env) xs >|= T.vector
+  | T.Map (xs, _) ->
+      T.MalMap.fold
+        (fun k v acc ->
+          let* acc = acc in
+          (* let* k = eval env k in *)
+          let* v = eval env v in
+          Ok (T.MalMap.add k v acc))
+        xs (Ok T.MalMap.empty)
+      >|= T.map
   | T.List ([ T.Symbol "def!"; T.Symbol key; expr ], _) ->
       let* value = eval env expr in
       Env.set key value env;
       Ok value
-  | T.List ([ T.Symbol "let*"; T.List (binds, _); body ], _)
-  | T.List ([ T.Symbol "let*"; T.Vector (binds, _); body ], _) ->
+  | T.List ([ T.Symbol "let*"; T.List (binds, _); expr ], _)
+  | T.List ([ T.Symbol "let*"; T.Vector (binds, _); expr ], _) ->
       let sub_env = Env.make (Some env) in
       let rec bind_pairs = function
-        | T.Symbol key :: expr :: tail ->
-            let* value = eval sub_env expr in
+        | T.Symbol key :: value :: xs ->
+            let* value = eval sub_env value in
             Env.set key value sub_env;
-            bind_pairs tail
-        | _ :: _ :: _ -> T.errstr "'let*' keys must be symbols"
-        | _ :: [] ->
-            T.errstr "'let*' bindings must be an even number of elements"
+            bind_pairs xs
+        | _ :: _ :: _ -> T.errstr "let* keys must be symbols"
+        | _ :: [] -> T.errstr "let* bindings must be an even number of elements"
         | [] -> Ok ()
       in
       let* () = bind_pairs binds in
-      eval sub_env body
-  | T.List (T.Symbol "do" :: body, _) ->
-      T.LT.fold_m (fun _acc x -> eval env x) T.nil body
+      eval sub_env expr
+  | T.List (T.Symbol "do" :: xs, _) ->
+      T.LT.fold_m (fun _acc x -> eval env x) T.nil xs
   | T.List ([ T.Symbol "if"; cond; then_expr; else_expr ], _) -> (
       eval env cond
       >>= function
@@ -59,26 +68,25 @@ let rec eval env ast =
       >>= function
       | T.Nil | T.Bool false -> Ok T.Nil
       | _ -> eval env then_expr)
-  | T.List ([ T.Symbol "fn*"; T.List (binds, _); body ], _)
-  | T.List ([ T.Symbol "fn*"; T.Vector (binds, _); body ], _) ->
-      (fun exprs ->
-        let sub_env = Env.make (Some env) in
-        let rec bind_args = function
-          | [ T.Symbol "&"; T.Symbol name ], args ->
-              Env.set name (T.list args) sub_env;
-              Ok ()
-          | T.Symbol name :: names, arg :: args ->
-              Env.set name arg sub_env;
-              bind_args (names, args)
-          | [], [] -> Ok ()
-          | _ ->
-              T.errstr
-                (sprintf "Expected %d args, got %d" (List.length binds)
-                   (List.length exprs))
-        in
-        let* () = bind_args (binds, exprs) in
-        eval sub_env body)
-      |> T.fn'
+  | T.List ([ T.Symbol "fn*"; T.List (binds, _); expr ], _)
+  | T.List ([ T.Symbol "fn*"; T.Vector (binds, _); expr ], _) ->
+      T.fn' (fun args ->
+          let sub_env = Env.make (Some env) in
+          let rec bind_args = function
+            | [ T.Symbol "&"; T.Symbol name ], args ->
+                Env.set name (T.list args) sub_env;
+                Ok ()
+            | T.Symbol name :: names, arg :: args ->
+                Env.set name arg sub_env;
+                bind_args (names, args)
+            | [], [] -> Ok ()
+            | _ ->
+                T.errstr
+                  (sprintf "Expected %d args, got %d" (List.length binds)
+                     (List.length args))
+          in
+          let* () = bind_args (binds, args) in
+          eval sub_env expr)
   | T.List ([ T.Symbol "quote"; ast ], _) -> Ok ast
   | T.List ([ T.Symbol "quasiquote"; ast ], _) -> eval env (quasiquote ast)
   | T.List ([ T.Symbol "defmacro!"; T.Symbol key; expr ], _) -> (
@@ -94,14 +102,14 @@ let rec eval env ast =
       ( [
           T.Symbol "try*";
           try_expr;
-          T.List ([ T.Symbol "catch*"; T.Symbol bind; catch_expr ], _);
+          T.List ([ T.Symbol "catch*"; T.Symbol key; catch_expr ], _);
         ],
         _ ) -> (
       match eval env try_expr with
       | Ok _ as ok -> ok
       | Error err ->
           let sub_env = Env.make (Some env) in
-          Env.set bind err sub_env;
+          Env.set key err sub_env;
           eval sub_env catch_expr)
   | T.List (x :: xs, _) -> (
       eval env x
@@ -109,77 +117,58 @@ let rec eval env ast =
       | T.Fn ((f, _) as fn) when T.is_macro fn -> f xs >>= eval env
       | T.Fn (f, _) -> T.LT.map_m (eval env) xs >>= f
       | _ -> T.errstr (sprintf "'%s' is not callable" (T.to_string true x)))
-  | T.Vector (xs, _) -> T.LT.map_m (eval env) xs >|= T.vector
-  | T.Map (xs, _) ->
-      T.MalMap.fold
-        (fun k v acc ->
-          let* acc = acc in
-          (* let* k = eval env k in *)
-          let* v = eval env v in
-          Ok (T.MalMap.add k v acc))
-        xs (Ok T.MalMap.empty)
-      >|= T.map
   | x -> Ok x
 
 let read str = Reader.read_str str
 let print exp = T.to_string true exp
+let repl_env = Core.ns
 
 (* eval all forms (lazy) *)
 let rep str =
   read str
   |> Seq.map (function
-    | Ok ast -> Result.(eval Core.ns ast >|= print)
+    | Ok ast -> Result.(eval repl_env ast >|= print)
     | Error _ as err -> err)
 
-(* return on first error (eager) *)
+(* exit on first error (eager) *)
 let re str =
   read str
   |> T.ST.map_m (function
-    | Ok ast -> eval Core.ns ast
+    | Ok ast -> eval repl_env ast
     | Error _ as err -> err)
-  |> Result.map_err (T.to_string false)
-
-let mal_defs () =
-  let open Result in
-  let* _not = re "(def! not (fn* (a) (if a false true)))" in
-  let* _load_file =
-    re
-      "(def! load-file (fn* (f) (eval (read-string (str \"(do \" (slurp f) \"\n\
-       nil)\")))))"
-  in
-  let+ _cond =
-    re
-      "(defmacro! cond (fn* (& xs) (if (> (count xs) 0) (list 'if (first xs) \
-       (if (> (count xs) 1) (nth xs 1) (throw \"odd number of forms to \
-       cond\")) (cons 'cond (rest (rest xs)))))))"
-  in
-  ()
+  |> function
+  | Ok _ -> ()
+  | Error e ->
+      printf "Error: %s\n%!" (T.to_string false e);
+      exit 1
 
 let () =
-  Core.init Core.ns;
-
-  Env.set "*host-language*" (T.String "OCaml") Core.ns;
-
+  Env.set "eval"
+    (T.fn (function
+      | [ ast ] -> eval repl_env ast
+      | xs -> Core.invalid_num_args "eval" xs))
+    repl_env;
   Env.set "*ARGV*"
     (if Array.length Sys.argv > 1 then
        Sys.argv |> Array.to_list |> List.drop 2 |> List.map T.string |> T.list
      else T.list [])
-    Core.ns;
+    repl_env;
 
-  Env.set "eval"
-    (T.fn (function
-      | [ ast ] -> eval Core.ns ast
-      | xs -> Core.invalid_num_args "eval" xs))
-    Core.ns;
-
-  mal_defs () |> Result.get_or_failwith;
+  re {|(def! *host-language* "OCaml")|};
+  re "(def! not (fn* (a) (if a false true)))";
+  re
+    "(def! load-file (fn* (f) (eval (read-string (str \"(do \" (slurp f) \"\n\
+     nil)\")))))";
+  re
+    "(defmacro! cond (fn* (& xs) (if (> (count xs) 0) (list 'if (first xs) (if \
+     (> (count xs) 1) (nth xs 1) (throw \"odd number of forms to cond\")) \
+     (cons 'cond (rest (rest xs)))))))";
 
   if Array.length Sys.argv > 1 then
     re (sprintf {|(load-file "%s")|} Sys.argv.(1))
-    |> Result.iter_err (printf "Error: %s\n%!")
   else
     try
-      re {|(println (str "Mal [" *host-language* "]" ))|} |> ignore;
+      re {|(println (str "Mal [" *host-language* "]" ))|};
       while true do
         printf "user> %!";
         read_line ()
