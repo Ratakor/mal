@@ -1,7 +1,8 @@
 module T = Types
 open Result
 
-let number_re = Str.regexp {|-?[0-9]+|}
+let float_re = Str.regexp {|^-?[0-9]+\.[0-9]*$|}
+let int_re = Str.regexp {|^-?[0-9]+$|}
 
 let token_re =
   Str.regexp
@@ -17,15 +18,14 @@ let tokenize str =
     | Str.Text _ -> None)
 
 let is_comment s = Char.(s.[0] = ';')
-let is_int_literal s = Str.string_match number_re s 0
+let is_char_literal s = Char.(s.[0] = '\\') && String.length s = 2
+let is_int_literal s = Str.string_match int_re s 0
+let is_float_literal s = Str.string_match float_re s 0
 let is_string_literal s = Char.(s.[0] = '"')
 let is_keyword_literal s = Char.(s.[0] = ':')
 
 let unexpected_eof expected =
   T.errstr (Printf.sprintf "Expected '%s', got EOF" expected)
-
-let unescaped s =
-  try Ok (Scanf.sscanf s "%S%!" Fun.id) with _ -> unexpected_eof "\""
 
 let rec read_form ?(expected = "") = function
   | [] -> (
@@ -75,9 +75,13 @@ and read_atom = function
   | "nil" -> T.nil'
   | "true" -> T.maltrue'
   | "false" -> T.malfalse'
+  | x when is_char_literal x -> T.char' x.[1]
+  | x when is_float_literal x -> T.float' (float_of_string x)
   | x when is_int_literal x -> (
-      try T.int' (int_of_string x) with _ -> T.errstr "Number too big")
-  | x when is_string_literal x -> unescaped x >|= T.string
+      try T.int' (int_of_string x) with _ -> T.errstr "Integer too big")
+  | x when is_string_literal x -> (
+      try T.string' (Scanf.sscanf x "%S%!" Fun.id)
+      with _ -> unexpected_eof "\"")
   | x when is_keyword_literal x ->
       T.keyword' (String.sub x 1 (String.length x - 1))
   | x -> T.symbol' x
