@@ -29,6 +29,7 @@ end = struct
   let compare = Stdlib.compare
 end
 
+(* rename to ArrayMap? *)
 and MalMap : (Map.S with type key = MalValue.t) = Map.Make (MalValue)
 
 include Types
@@ -70,7 +71,7 @@ let to_string readably =
   let rec aux = function
     | Nil -> "nil"
     | Bool x -> string_of_bool x
-    | Char x -> Printf.sprintf "%C" x
+    | Char x -> Printf.sprintf "\\%c" x
     | Int x -> string_of_int x
     | Float x -> string_of_float x
     | String x when readably -> Printf.sprintf "%S" x
@@ -88,10 +89,24 @@ let to_string readably =
   in
   aux
 
+let type_name = function
+  | Nil -> "Nil"
+  | Bool _ -> "Bool"
+  | Char _ -> "Char"
+  | Int _ -> "Int"
+  | Float _ -> "Float"
+  | String _ -> "String"
+  | Symbol _ -> "Symbol"
+  | Keyword _ -> "Keyword"
+  | List _ -> "List"
+  | Vector _ -> "Vector"
+  | Map _ -> "Map"
+  | Seq _ -> "Seq"
+  | Fn _ -> "Function"
+  | Atom _ -> "Atom"
+
 (* Constructor wrappers *)
 let nil = Nil
-let maltrue = Bool true
-let malfalse = Bool false
 let bool x = Bool x
 let char x = Char x
 let int x = Int x
@@ -105,11 +120,12 @@ let map ?(meta = nil) x = Map (x, meta)
 let seq x = Seq x
 let fn ?(meta = nil) x = Fn (x, meta)
 let atom x = Atom (ref x)
+let maltrue = bool true
+let malfalse = bool false
+let empty_list = list []
 
 (* Constructor wrappers with result *)
 let nil' = Ok nil
-let maltrue' = Ok maltrue
-let malfalse' = Ok malfalse
 let bool' x = Ok (bool x)
 let char' x = Ok (char x)
 let int' x = Ok (int x)
@@ -123,6 +139,9 @@ let map' ?(meta = nil) x = Ok (map x ~meta)
 let fn' ?(meta = nil) x = Ok (fn x ~meta)
 let seq' x = Ok (seq x)
 let atom' x = Ok (atom x)
+let maltrue' = Ok maltrue
+let malfalse' = Ok malfalse
+let empty_list' = Ok empty_list
 let errstr x = Error (string x)
 
 let rec map_of_list ?(meta = nil) acc = function

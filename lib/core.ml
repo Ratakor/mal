@@ -120,7 +120,27 @@ let is_string self = function
   | xs -> invalid_num_args self xs
 
 let is_number self = function
+  | [ T.Int _ ] | [ T.Float _ ] -> T.maltrue'
+  | [ _ ] -> T.malfalse'
+  | xs -> invalid_num_args self xs
+
+let is_char self = function
+  | [ T.Char _ ] -> T.maltrue'
+  | [ _ ] -> T.malfalse'
+  | xs -> invalid_num_args self xs
+
+let is_int self = function
   | [ T.Int _ ] -> T.maltrue'
+  | [ _ ] -> T.malfalse'
+  | xs -> invalid_num_args self xs
+
+let is_float self = function
+  | [ T.Float _ ] -> T.maltrue'
+  | [ _ ] -> T.malfalse'
+  | xs -> invalid_num_args self xs
+
+let is_seq self = function
+  | [ T.Seq _ ] -> T.maltrue'
   | [ _ ] -> T.malfalse'
   | xs -> invalid_num_args self xs
 
@@ -210,9 +230,13 @@ let conj self = function
 let seq self = function
   | [ T.List ([], _) ] | [ T.Vector ([], _) ] | [ T.String "" ] | [ T.Nil ] ->
       T.nil'
-  | [ T.List (x, _) ] | [ T.Vector (x, _) ] -> T.list' x
+  | [ T.List (x, _) ] | [ T.Vector (x, _) ] -> T.seq' (List.to_seq x)
   | [ T.String x ] ->
-      String.to_list x |> List.map Fun.(String.make 1 %> T.string) |> T.list'
+      let rec aux s i len () =
+        if len = 0 then Seq.Nil
+        else Seq.Cons (T.char s.[i], aux s (i + 1) (len - 1))
+      in
+      T.seq' (aux x 0 (String.length x))
   | [ _ ] -> invalid_arg self
   | xs -> invalid_num_args self xs
 
@@ -338,6 +362,10 @@ let with_meta self = function
   | [ _; _ ] -> invalid_arg self
   | xs -> invalid_num_args self xs
 
+let type_name self = function
+  | [ x ] -> T.string' (T.type_name x)
+  | xs -> invalid_num_args self xs
+
 let ns =
   let env = Env.make None in
   let set s f = Env.set s (T.fn (f ("Core." ^ s))) env in
@@ -356,6 +384,10 @@ let ns =
   set "number?" is_number;
   set "fn?" is_fn;
   set "macro?" is_macro;
+  set "char?" is_char;
+  set "int?" is_int;
+  set "float?" is_float;
+  set "seq?" is_seq;
 
   set "pr-str" pr_str;
   set "str" str;
@@ -410,5 +442,7 @@ let ns =
   set "deref" deref;
   set "reset!" reset;
   set "swap!" swap;
+
+  set "type" type_name;
 
   env
